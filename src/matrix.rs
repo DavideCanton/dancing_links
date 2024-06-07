@@ -174,11 +174,13 @@ impl<'a> Iterator for SetIterator<'a> {
         let mut set = HashSet::new();
         let mut i = self.last;
         let mut cur_row = None;
+        let mut data_found = false;
 
         while i < self.matrix.cells_vec.len() {
             let c = self.matrix.cell(i);
 
             if let CellRow::Data(row) = c.row {
+                data_found = true;
                 match cur_row {
                     Some(cur_row) => {
                         if cur_row != row {
@@ -196,7 +198,8 @@ impl<'a> Iterator for SetIterator<'a> {
         }
 
         self.last = i;
-        Some(set)
+
+        data_found.then_some(set)
     }
 }
 
@@ -223,5 +226,42 @@ impl Debug for DancingLinksMatrix {
             ));
         }
         write!(f, "{}", matrix)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_iterator() {
+        let mut matrix = DancingLinksMatrix::new(&[
+            ColumnSpec::from(1),
+            ColumnSpec::from(2),
+            ColumnSpec::from(3),
+        ]);
+        matrix.add_sparse_row(&[1, 2], true);
+        matrix.add_sparse_row(&[1, 3], true);
+        matrix.add_sparse_row(&[2, 3], true);
+        matrix.add_sparse_row(&[1, 2, 3], true);
+
+        let mut it = matrix.iter_rows();
+        assert_eq!(it.next().unwrap(), HashSet::from([1, 2]));
+        assert_eq!(it.next().unwrap(), HashSet::from([1, 3]));
+        assert_eq!(it.next().unwrap(), HashSet::from([2, 3]));
+        assert_eq!(it.next().unwrap(), HashSet::from([1, 2, 3]));
+        assert_eq!(it.next(), None);
+    }
+
+    #[test]
+    fn test_iterator_no_rows() {
+        let matrix = DancingLinksMatrix::new(&[
+            ColumnSpec::from(1),
+            ColumnSpec::from(2),
+            ColumnSpec::from(3),
+        ]);
+
+        let mut it = matrix.iter_rows();
+        assert_eq!(it.next(), None);
     }
 }
