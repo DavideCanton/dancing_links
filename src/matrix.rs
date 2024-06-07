@@ -1,30 +1,30 @@
-use std::{borrow::Cow, fmt::Debug};
+use std::{borrow::Cow, collections::HashSet, fmt::Debug};
 
 use crate::cells::{Cell, CellRow, HeaderCell};
 
 pub struct ColumnSpec {
-    name: String,
+    name: usize,
     primary: bool,
 }
 
 impl ColumnSpec {
-    pub fn primary(name: &str) -> ColumnSpec {
+    pub fn primary(name: usize) -> ColumnSpec {
         ColumnSpec {
-            name: name.to_string(),
+            name,
             primary: true,
         }
     }
 
-    pub fn secondary(name: &str) -> ColumnSpec {
+    pub fn secondary(name: usize) -> ColumnSpec {
         ColumnSpec {
-            name: name.to_string(),
+            name,
             primary: false,
         }
     }
 }
 
-impl From<&str> for ColumnSpec {
-    fn from(name: &str) -> Self {
+impl From<usize> for ColumnSpec {
+    fn from(name: usize) -> Self {
         Self::primary(name)
     }
 }
@@ -47,25 +47,22 @@ impl DancingLinksMatrix {
             cells_vec: Vec::with_capacity(names.len() * 4),
         };
 
-        let (header_index, _) = matrix.add_header("<H>", true, 0);
+        let (header_index, _) = matrix.add_header(0, true, 0);
         matrix.header = header_index;
 
         let mut prev_index = header_index;
 
         for (n, spec) in names.iter().enumerate() {
             let primary = spec.primary;
-            let (_, cell_index) = matrix.add_header(&spec.name, false, n);
+            let (_, cell_index) = matrix.add_header(spec.name, false, n);
 
             if primary {
-                matrix.cell_mut(prev_index).right = cell_index;
-                matrix.cell_mut(cell_index).left = prev_index;
+                matrix.link_right(prev_index, cell_index);
                 prev_index = cell_index;
             }
         }
 
-        matrix.cell_mut(prev_index).right = header_index;
-        matrix.cell_mut(header_index).left = prev_index;
-
+        matrix.link_right(prev_index, header_index);
         matrix
     }
 
@@ -85,8 +82,7 @@ impl DancingLinksMatrix {
 
             match prev_index {
                 Some(prev_index) => {
-                    self.cell_mut(prev_index).right = in_cell_index;
-                    self.cell_mut(in_cell_index).left = prev_index;
+                    self.link_right(prev_index, in_cell_index);
                 }
                 None => {
                     start_index = cell_index;
@@ -96,24 +92,21 @@ impl DancingLinksMatrix {
             let header = self.header_mut(ind);
             let header_cell_index = header.cell;
             header.size += 1;
-            let header_cell = self.cell_mut(header_cell_index);
+            let last = self.cell_mut(header_cell_index).up;
 
-            let last = header_cell.up;
-            header_cell.up = in_cell_index;
-
-            self.cell_mut(last).down = in_cell_index;
-
-            let cell_mut = self.cell_mut(in_cell_index);
-            cell_mut.up = last;
-            cell_mut.down = header_cell_index;
+            self.link_down(in_cell_index, header_cell_index);
+            self.link_down(last, in_cell_index);
 
             prev_index = cell_index;
         }
 
-        self.cell_mut(start_index.unwrap()).left = cell_index.unwrap();
-        self.cell_mut(cell_index.unwrap()).right = start_index.unwrap();
+        self.link_right(cell_index.unwrap(), start_index.unwrap());
 
         self.rows += 1;
+    }
+
+    pub fn iter_rows(&self) -> SetIterator {
+        SetIterator::new(self)
     }
 
     fn add_cell(&mut self, header: usize, row: CellRow, column: usize) -> usize {
@@ -123,13 +116,17 @@ impl DancingLinksMatrix {
         index
     }
 
-    fn add_header(&mut self, name: &str, first: bool, column: usize) -> (usize, usize) {
+    fn add_header(&mut self, name: usize, first: bool, column: usize) -> (usize, usize) {
         let cell_index = self.add_cell(999, CellRow::Header, column);
         let header = HeaderCell::new(name, first, cell_index);
         let index = self.headers_vec.len();
         self.headers_vec.push(header);
         self.cell_mut(cell_index).header = index;
         (index, cell_index)
+    }
+
+    fn cell(&self, index: usize) -> &Cell {
+        &self.cells_vec[index]
     }
 
     fn cell_mut(&mut self, index: usize) -> &mut Cell {
@@ -143,6 +140,64 @@ impl DancingLinksMatrix {
     fn header(&self, index: usize) -> &HeaderCell {
         &self.headers_vec[index]
     }
+
+    fn link_right(&mut self, left: usize, right: usize) {
+        self.cell_mut(left).right = right;
+        self.cell_mut(right).left = left;
+    }
+
+    fn link_down(&mut self, up: usize, down: usize) {
+        self.cell_mut(up).down = down;
+        self.cell_mut(down).up = up;
+    }
+}
+
+pub struct SetIterator<'a> {
+    matrix: &'a DancingLinksMatrix,
+    last: usize,
+}
+
+impl<'a> SetIterator<'a> {
+    fn new(matrix: &'a DancingLinksMatrix) -> SetIterator<'a> {
+        SetIterator { matrix, last: 0 }
+    }
+}
+
+impl<'a> Iterator for SetIterator<'a> {
+    type Item = HashSet<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.last >= self.matrix.cells_vec.len() {
+            return None;
+        }
+
+        let mut set = HashSet::new();
+        let mut i = self.last;
+        let mut cur_row = None;
+
+        while i < self.matrix.cells_vec.len() {
+            let c = self.matrix.cell(i);
+
+            if let CellRow::Data(row) = c.row {
+                match cur_row {
+                    Some(cur_row) => {
+                        if cur_row != row {
+                            break;
+                        }
+                    }
+                    None => {
+                        cur_row.replace(row);
+                    }
+                }
+                set.insert(self.matrix.header(c.header).name);
+            }
+
+            i += 1;
+        }
+
+        self.last = i;
+        Some(set)
+    }
 }
 
 impl Debug for DancingLinksMatrix {
@@ -153,7 +208,7 @@ impl Debug for DancingLinksMatrix {
             if i != 0 {
                 matrix.push(' ');
             }
-            matrix.push_str(&header.name);
+            matrix.push_str(&format!("{}", header.name));
         }
         matrix.push('\n');
 
