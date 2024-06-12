@@ -6,19 +6,28 @@ pub(crate) enum CellRow {
     Data(usize),
 }
 
+impl From<usize> for CellRow {
+    fn from(name: usize) -> Self {
+        match name {
+            0 => CellRow::Header,
+            name => CellRow::Data(name),
+        }
+    }
+}
+
 #[derive(Debug)]
-pub(crate) struct Cell<K> {
+pub(crate) struct Cell<K, H> {
     pub(crate) index: K,
     pub(crate) up: K,
     pub(crate) down: K,
     pub(crate) left: K,
     pub(crate) right: K,
-    pub(crate) header: K,
+    pub(crate) header: H,
     pub(crate) row: CellRow,
 }
 
-impl<K: Copy + Clone> Cell<K> {
-    pub fn new(index: K, header: K, row: CellRow) -> Cell<K> {
+impl<K: Copy + Clone, H: Copy + Clone> Cell<K, H> {
+    pub fn new(index: K, header: H, row: CellRow) -> Cell<K, H> {
         Cell {
             index,
             up: index,
@@ -31,14 +40,24 @@ impl<K: Copy + Clone> Cell<K> {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub(crate) enum HeaderName {
     First,
     Other(usize),
 }
 
+impl From<usize> for HeaderName {
+    fn from(name: usize) -> Self {
+        match name {
+            0 => HeaderName::First,
+            name => HeaderName::Other(name),
+        }
+    }
+}
+
 #[derive(Debug)]
-pub(crate) struct HeaderCell<K> {
+pub(crate) struct HeaderCell<K, H> {
+    pub(crate) index: H,
     pub(crate) name: HeaderName,
     pub(crate) size: usize,
     pub(crate) cell: K,
@@ -53,9 +72,10 @@ impl Display for HeaderName {
     }
 }
 
-impl<K: Copy + Clone> HeaderCell<K> {
-    pub fn new(name: HeaderName, cell_index: K) -> HeaderCell<K> {
+impl<K: Copy + Clone, H: Copy + Clone> HeaderCell<K, H> {
+    pub fn new(name: HeaderName, index: H, cell_index: K) -> HeaderCell<K, H> {
         HeaderCell {
+            index,
             name,
             size: 0,
             cell: cell_index,
@@ -85,15 +105,17 @@ mod tests {
 
     #[test]
     fn test_header_cell_new() {
-        let header_cell = HeaderCell::new(HeaderName::Other(1), 2);
+        let header_cell = HeaderCell::new(HeaderName::Other(1), 3, 2);
         assert_eq!(header_cell.name, HeaderName::Other(1));
         assert_eq!(header_cell.size, 0);
+        assert_eq!(header_cell.index, 3);
         assert!(!header_cell.is_first());
         assert_eq!(header_cell.cell, 2);
 
-        let header_cell = HeaderCell::new(HeaderName::First, 12);
+        let header_cell = HeaderCell::new(HeaderName::First, 10, 12);
         assert_eq!(header_cell.name, HeaderName::First);
         assert_eq!(header_cell.size, 0);
+        assert_eq!(header_cell.index, 10);
         assert!(header_cell.is_first());
         assert_eq!(header_cell.cell, 12);
     }
