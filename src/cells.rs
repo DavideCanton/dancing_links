@@ -15,6 +15,15 @@ impl From<usize> for CellRow {
     }
 }
 
+impl Display for CellRow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CellRow::Header => "H".fmt(f),
+            CellRow::Data(name) => name.fmt(f),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Cell<K, H> {
     pub(crate) index: K,
@@ -55,21 +64,21 @@ impl From<usize> for HeaderName {
     }
 }
 
+impl Display for HeaderName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HeaderName::First => "<H>".fmt(f),
+            HeaderName::Other(name) => name.fmt(f),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct HeaderCell<K, H> {
     pub(crate) index: H,
     pub(crate) name: HeaderName,
     pub(crate) size: usize,
     pub(crate) cell: K,
-}
-
-impl Display for HeaderName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            HeaderName::First => write!(f, "<H>"),
-            HeaderName::Other(name) => write!(f, "{}", name),
-        }
-    }
 }
 
 impl<K: Copy + Clone, H: Copy + Clone> HeaderCell<K, H> {
