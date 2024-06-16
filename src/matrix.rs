@@ -424,6 +424,11 @@ impl<'a> RowIterator<'a> {
 impl<'a> Iterator for RowIterator<'a> {
     type Item = HashSet<usize>;
 
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let r = self.matrix.rows;
+        (r, Some(r))
+    }
+
     fn next(&mut self) -> Option<Self::Item> {
         if self.last >= self.matrix.cells.len() {
             return None;
@@ -464,6 +469,12 @@ impl<'a> Iterator for RowIterator<'a> {
         self.last = i;
 
         data_found.then_some(set)
+    }
+}
+
+impl ExactSizeIterator for RowIterator<'_> {
+    fn len(&self) -> usize {
+        self.matrix.rows
     }
 }
 
@@ -617,6 +628,7 @@ mod tests {
         let matrix = build_matrix();
 
         let mut it = matrix.iter_rows();
+        assert_eq!(it.len(), 4);
         assert_eq!(it.next().unwrap(), HashSet::from([1, 2]));
         assert_eq!(it.next().unwrap(), HashSet::from([1, 3]));
         assert_eq!(it.next().unwrap(), HashSet::from([2, 3]));
@@ -634,6 +646,7 @@ mod tests {
             .build();
 
         let mut it = matrix.iter_rows();
+        assert_eq!(it.len(), 0);
         assert_eq!(it.next(), None);
     }
 
