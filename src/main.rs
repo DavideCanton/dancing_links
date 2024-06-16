@@ -7,7 +7,7 @@ mod keys;
 mod matrix;
 
 fn main() {
-    let mut matrix = MatrixBuilder::from_iterable_end(1..=5)
+    let mut matrix = MatrixBuilder::from_iterable(1..=5)
         .add_sorted_row(&[1, 2])
         .add_sorted_row(&[1, 3])
         .add_sorted_row(&[2, 5])

@@ -40,17 +40,10 @@ type HeaderCell = _HeaderCell<Key, HeaderKey>;
 pub struct MatrixBuilder;
 
 impl MatrixBuilder {
-    pub fn from_iterable_end<I: Into<ColumnSpec>, IT: Iterator<Item = I>>(
-        mut iterable: IT,
+    pub fn from_iterable<I: Into<ColumnSpec>, IT: IntoIterator<Item = I>>(
+        iterable: IT,
     ) -> MatrixRowBuilder {
-        let col = iterable.next().unwrap();
-        let mut builder = MatrixColBuilder::new().add_column(col);
-
-        for col in iterable {
-            builder = builder.add_column(col);
-        }
-
-        builder.end_columns()
+        iterable.into_iter().collect::<MatrixRowBuilder>()
     }
 
     pub fn add_column<I: Into<ColumnSpec>>(self, spec: I) -> MatrixColBuilder {
@@ -58,22 +51,21 @@ impl MatrixBuilder {
     }
 }
 
+pub struct MatrixColBuilder {
+    columns: Vec<ColumnSpec>,
+}
+
 impl<I: Into<ColumnSpec>> FromIterator<I> for MatrixColBuilder {
     fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
-        let mut iter = iter.into_iter();
-        let col = iter.next().unwrap();
-        let mut builder = MatrixColBuilder::new().add_column(col);
+        let iter = iter.into_iter();
 
+        let mut builder = MatrixColBuilder::new();
         for col in iter {
             builder = builder.add_column(col);
         }
 
         builder
     }
-}
-
-pub struct MatrixColBuilder {
-    columns: Vec<ColumnSpec>,
 }
 
 impl MatrixColBuilder {
@@ -124,6 +116,12 @@ impl MatrixColBuilder {
 
 pub struct MatrixRowBuilder {
     matrix: DancingLinksMatrix,
+}
+
+impl<I: Into<ColumnSpec>> FromIterator<I> for MatrixRowBuilder {
+    fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
+        iter.into_iter().collect::<MatrixColBuilder>().end_columns()
+    }
 }
 
 impl MatrixRowBuilder {
