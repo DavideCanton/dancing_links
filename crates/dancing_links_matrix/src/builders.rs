@@ -1,27 +1,43 @@
+use std::marker::PhantomData;
+
+use itertools::Itertools;
 use slab::Slab;
 
-use crate::{cells::{CellRow, HeaderName}, keys::HeaderKey, matrix::{ColumnSpec, DancingLinksMatrix}};
+use crate::{
+    cells::{CellRow, HeaderName},
+    matrix::{ColumnSpec, DancingLinksMatrix},
+};
 
-pub struct MatrixBuilder;
+pub struct MatrixBuilder<T>(PhantomData<T>);
 
-impl MatrixBuilder {
-    pub fn from_iterable<I: Into<ColumnSpec>, IT: IntoIterator<Item = I>>(
-        iterable: IT,
-    ) -> MatrixRowBuilder {
-        iterable.into_iter().collect::<MatrixRowBuilder>()
+impl<T: Eq> MatrixBuilder<T> {
+    pub fn new() -> MatrixBuilder<T> {
+        MatrixBuilder(PhantomData)
     }
 
-    pub fn add_column<I: Into<ColumnSpec>>(self, spec: I) -> MatrixColBuilder {
+    pub fn from_iterable<I: Into<ColumnSpec<T>>, IT: IntoIterator<Item = I>>(
+        iterable: IT,
+    ) -> MatrixRowBuilder<T> {
+        iterable.into_iter().collect::<MatrixRowBuilder<T>>()
+    }
+
+    pub fn add_column<I: Into<ColumnSpec<T>>>(self, spec: I) -> MatrixColBuilder<T> {
         MatrixColBuilder::new().add_column(spec)
     }
 }
 
-pub struct MatrixColBuilder {
-    columns: Vec<ColumnSpec>,
+impl<T: Eq> Default for MatrixBuilder<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-impl<I: Into<ColumnSpec>> FromIterator<I> for MatrixColBuilder {
-    fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
+pub struct MatrixColBuilder<T> {
+    columns: Vec<ColumnSpec<T>>,
+}
+
+impl<T: Eq, I: Into<ColumnSpec<T>>> FromIterator<I> for MatrixColBuilder<T> {
+    fn from_iter<IT: IntoIterator<Item = I>>(iter: IT) -> Self {
         let iter = iter.into_iter();
 
         let mut builder = MatrixColBuilder::new();
@@ -33,17 +49,17 @@ impl<I: Into<ColumnSpec>> FromIterator<I> for MatrixColBuilder {
     }
 }
 
-impl MatrixColBuilder {
-    fn new() -> MatrixColBuilder {
+impl<T: Eq> MatrixColBuilder<T> {
+    fn new() -> MatrixColBuilder<T> {
         MatrixColBuilder { columns: vec![] }
     }
 
-    pub fn add_column<I: Into<ColumnSpec>>(mut self, spec: I) -> MatrixColBuilder {
+    pub fn add_column<I: Into<ColumnSpec<T>>>(mut self, spec: I) -> MatrixColBuilder<T> {
         self.columns.push(spec.into());
         self
     }
 
-    pub fn end_columns(self) -> MatrixRowBuilder {
+    pub fn end_columns(self) -> MatrixRowBuilder<T> {
         if self.columns.is_empty() {
             panic!("No columns were added");
         }
@@ -79,33 +95,46 @@ impl MatrixColBuilder {
     }
 }
 
-pub struct MatrixRowBuilder {
-    matrix: DancingLinksMatrix,
+pub struct MatrixRowBuilder<T> {
+    matrix: DancingLinksMatrix<T>,
 }
 
-impl<I: Into<ColumnSpec>> FromIterator<I> for MatrixRowBuilder {
-    fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
-        iter.into_iter().collect::<MatrixColBuilder>().end_columns()
+impl<T: Eq, I: Into<ColumnSpec<T>>> FromIterator<I> for MatrixRowBuilder<T> {
+    fn from_iter<IT: IntoIterator<Item = I>>(iter: IT) -> Self {
+        iter.into_iter()
+            .collect::<MatrixColBuilder<T>>()
+            .end_columns()
     }
 }
 
-impl MatrixRowBuilder {
-    pub fn add_row(self, row: &[usize]) -> Self {
-        let mut sorted = row.to_vec();
+impl<T: Eq + Ord + Clone> MatrixRowBuilder<T> {
+    pub fn add_row<IT: IntoIterator<Item = T>>(self, row: IT) -> Self {
+        let mut sorted = row.into_iter().collect_vec();
         sorted.sort_unstable();
-        self.add_sorted_row(&sorted)
+        self.add_sorted_row(sorted)
     }
+}
 
-    pub fn add_sorted_row(mut self, row: &[usize]) -> Self {
+impl<T: Eq> MatrixRowBuilder<T> {
+    pub fn add_sorted_row<IT: IntoIterator<Item = T>>(mut self, row: IT) -> Self {
         let mx = &mut self.matrix;
 
         let mut cell_index = None;
         let mut prev_index = None;
         let mut start_index = None;
 
-        for ind in row.iter() {
+        for ind in row {
             // TODO check if ind is valid
-            let header_key = HeaderKey::from(*ind);
+            let header_key = mx
+                .headers
+                .iter()
+                .map(|h| h.1)
+                .find(|h| match h.name {
+                    HeaderName::First => false,
+                    HeaderName::Other(ref c) => *c == ind,
+                })
+                .unwrap()
+                .index;
 
             let in_cell_index = mx.add_cell(header_key, CellRow::Data(mx.rows + 1));
             cell_index = Some(in_cell_index);
@@ -136,7 +165,7 @@ impl MatrixRowBuilder {
         self
     }
 
-    pub fn build(self) -> DancingLinksMatrix {
+    pub fn build(self) -> DancingLinksMatrix<T> {
         self.matrix
     }
 }

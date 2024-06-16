@@ -1,24 +1,23 @@
 #![allow(dead_code)]
 
-use dancing_links_matrix::MatrixBuilder;
+use dancing_links_matrix::{AlgorithmXSolver, MatrixBuilder};
 
 fn main() {
-    let mut matrix = MatrixBuilder::from_iterable(1..=5)
-        .add_sorted_row(&[1, 2])
-        .add_sorted_row(&[1, 3])
-        .add_sorted_row(&[2, 5])
-        .add_sorted_row(&[1, 2, 3, 4])
+    let matrix = MatrixBuilder::from_iterable(["1", "2", "3", "4", "5", "6", "7"])
+        .add_sorted_row(["1", "4", "7"])
+        .add_sorted_row(["2", "3", "5"])
+        .add_sorted_row(["6"])
+        .add_sorted_row(["1", "3", "4", "7"])
+        .add_sorted_row(["2", "5"])
         .build();
 
-    println!("{matrix}");
-
-    // println!("{:?}", matrix.iter_rows().collect::<Vec<_>>());
-
-    matrix.cover(1.into());
-
-    println!("{matrix}");
-
-    matrix.uncover(1.into());
-
-    println!("{matrix}");
+    let mut solver = AlgorithmXSolver::new(
+        matrix,
+        |s| {
+            println!("{s:?}");
+            false
+        },
+        true,
+    );
+    solver.solve();
 }

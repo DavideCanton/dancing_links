@@ -1,23 +1,25 @@
 use slab::Slab;
+use std::hash::Hash;
+use std::marker::PhantomData;
 use std::{collections::HashSet, fmt};
 
-use crate::cells::{Cell as _Cell, CellRow, HeaderCell as _HeaderCell, HeaderName};
+use crate::cells::{Cell, CellRow, HeaderCell, HeaderName};
 use crate::keys::{HeaderKey, Key};
 
-pub struct ColumnSpec {
-    pub(crate) name: usize,
+pub struct ColumnSpec<T> {
+    pub(crate) name: T,
     pub(crate) primary: bool,
 }
 
-impl ColumnSpec {
-    pub fn primary(name: usize) -> ColumnSpec {
+impl<T> ColumnSpec<T> {
+    pub fn primary(name: T) -> ColumnSpec<T> {
         ColumnSpec {
             name,
             primary: true,
         }
     }
 
-    pub fn secondary(name: usize) -> ColumnSpec {
+    pub fn secondary(name: T) -> ColumnSpec<T> {
         ColumnSpec {
             name,
             primary: false,
@@ -25,35 +27,35 @@ impl ColumnSpec {
     }
 }
 
-impl From<usize> for ColumnSpec {
-    fn from(name: usize) -> Self {
+impl<T> From<T> for ColumnSpec<T> {
+    fn from(name: T) -> Self {
         Self::primary(name)
     }
 }
 
-type Cell = _Cell<Key, HeaderKey>;
-type HeaderCell = _HeaderCell<Key, HeaderKey>;
-
-pub struct DancingLinksMatrix {
+pub struct DancingLinksMatrix<T> {
     pub(crate) header_key: HeaderKey,
     pub(crate) rows: usize,
     pub(crate) columns: usize,
-    pub(crate) headers: Slab<HeaderCell>,
+    pub(crate) headers: Slab<HeaderCell<T>>,
     pub(crate) cells: Slab<Cell>,
 }
 
-impl DancingLinksMatrix {
-    pub fn iter_rows(&self) -> RowIterator {
+impl<T: Eq> DancingLinksMatrix<T> {
+    pub fn iter_rows<U: ?Sized>(&self) -> RowIterator<T, U>
+    where
+        T: AsRef<U>,
+    {
         RowIterator::new(self)
     }
 
-    pub(crate) fn min_column(&self) -> Option<&HeaderCell> {
+    pub(crate) fn min_column(&self) -> Option<&HeaderCell<T>> {
         self.iterate_headers(self.header_key, |h| h.right, false)
             .min_by_key(|h| h.size)
     }
 
     #[cfg(feature = "random")]
-    pub(crate) fn random_column(&self) -> Option<&HeaderCell> {
+    pub(crate) fn random_column(&self) -> Option<&HeaderCell<T>> {
         use rand::{thread_rng, Rng};
 
         if self.columns == 0 {
@@ -144,12 +146,12 @@ impl DancingLinksMatrix {
         cell_l.right = header_cell_index;
     }
 
-    fn iterate_cells<F: Fn(&Cell) -> Key>(
+    pub(crate) fn iterate_cells<F: Fn(&Cell) -> Key>(
         &self,
         start: Key,
         getter: F,
         include_start: bool,
-    ) -> CellIterator<F> {
+    ) -> CellIterator<F, T> {
         CellIterator::new(self, start, getter, include_start)
     }
 
@@ -158,7 +160,7 @@ impl DancingLinksMatrix {
         start: HeaderKey,
         getter: F,
         include_start: bool,
-    ) -> HeaderCellIterator<F> {
+    ) -> HeaderCellIterator<F, T> {
         HeaderCellIterator::new(self, start, getter, include_start)
     }
 
@@ -170,7 +172,7 @@ impl DancingLinksMatrix {
         actual_key
     }
 
-    pub(crate) fn add_header(&mut self, name: HeaderName) -> (HeaderKey, Key) {
+    pub(crate) fn add_header(&mut self, name: HeaderName<T>) -> (HeaderKey, Key) {
         let header_key = self.headers.vacant_key().into();
         let header_cell_key = self.add_cell(header_key, CellRow::Header);
 
@@ -181,7 +183,10 @@ impl DancingLinksMatrix {
         (actual_header_key, header_cell_key)
     }
 
-    fn locate_cell<R: Into<CellRow>, C: Into<HeaderName>>(&self, row: R, column: C) -> Option<Key> {
+    fn locate_cell<R: Into<CellRow>, C: Eq + ?Sized>(&self, row: R, column: &C) -> Option<Key>
+    where
+        T: AsRef<C>,
+    {
         let header_key = self.locate_header(column)?;
         let header = self.header(header_key);
         let row = row.into();
@@ -191,10 +196,15 @@ impl DancingLinksMatrix {
             .map(|c| c.index)
     }
 
-    fn locate_header<C: Into<HeaderName>>(&self, column: C) -> Option<HeaderKey> {
-        let column = column.into();
+    fn locate_header<C: Eq + ?Sized>(&self, column: &C) -> Option<HeaderKey>
+    where
+        T: AsRef<C>,
+    {
         self.iterate_headers(self.header_key, |c| c.right, true)
-            .find(|h| h.name == column)
+            .find(|h| match h.name {
+                HeaderName::First => false,
+                HeaderName::Other(ref c) => *c.as_ref() == *column,
+            })
             .map(|h| h.index)
     }
 
@@ -206,11 +216,11 @@ impl DancingLinksMatrix {
         &mut self.cells[key.into()]
     }
 
-    pub(crate) fn header_mut(&mut self, key: HeaderKey) -> &mut HeaderCell {
+    pub(crate) fn header_mut(&mut self, key: HeaderKey) -> &mut HeaderCell<T> {
         &mut self.headers[key.into()]
     }
 
-    pub(crate) fn header(&self, key: HeaderKey) -> &HeaderCell {
+    pub(crate) fn header(&self, key: HeaderKey) -> &HeaderCell<T> {
         &self.headers[key.into()]
     }
 
@@ -225,7 +235,7 @@ impl DancingLinksMatrix {
     }
 }
 
-impl fmt::Display for DancingLinksMatrix {
+impl<T: fmt::Display> fmt::Display for DancingLinksMatrix<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut matrix = String::new();
 
@@ -267,19 +277,27 @@ impl fmt::Display for DancingLinksMatrix {
     }
 }
 
-pub struct RowIterator<'a> {
-    matrix: &'a DancingLinksMatrix,
+pub struct RowIterator<'a, T, U: ?Sized> {
+    matrix: &'a DancingLinksMatrix<T>,
     last: usize,
+    _p: PhantomData<Box<U>>,
 }
 
-impl<'a> RowIterator<'a> {
-    fn new(matrix: &'a DancingLinksMatrix) -> RowIterator<'a> {
-        RowIterator { matrix, last: 0 }
+impl<'a, T, U: ?Sized> RowIterator<'a, T, U> {
+    fn new(matrix: &'a DancingLinksMatrix<T>) -> RowIterator<'a, T, U> {
+        RowIterator {
+            matrix,
+            last: 0,
+            _p: PhantomData,
+        }
     }
 }
 
-impl<'a> Iterator for RowIterator<'a> {
-    type Item = HashSet<usize>;
+impl<'a, T: Eq, U: 'a + Eq + Hash + ?Sized> Iterator for RowIterator<'a, T, U>
+where
+    T: AsRef<U>,
+{
+    type Item = HashSet<&'a U>;
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         let r = self.matrix.rows;
@@ -312,10 +330,10 @@ impl<'a> Iterator for RowIterator<'a> {
                     }
                 }
 
-                match self.matrix.header(c.header).name {
+                match &self.matrix.header(c.header).name {
                     HeaderName::First => panic!("A cell should not have the first header as name"),
                     HeaderName::Other(name) => {
-                        set.insert(name);
+                        set.insert(name.as_ref());
                     }
                 }
             }
@@ -329,14 +347,14 @@ impl<'a> Iterator for RowIterator<'a> {
     }
 }
 
-impl ExactSizeIterator for RowIterator<'_> {
+impl<'a, T: Eq + AsRef<U>, U: 'a + Eq + Hash + ?Sized> ExactSizeIterator for RowIterator<'a, T, U> {
     fn len(&self) -> usize {
         self.matrix.rows
     }
 }
 
-struct CellIterator<'a, F> {
-    matrix: &'a DancingLinksMatrix,
+pub(crate) struct CellIterator<'a, F, T> {
+    matrix: &'a DancingLinksMatrix<T>,
     start: Key,
     current: Key,
     getter: F,
@@ -344,16 +362,16 @@ struct CellIterator<'a, F> {
     include_start: bool,
 }
 
-impl<'a, F> CellIterator<'a, F>
+impl<'a, F, T> CellIterator<'a, F, T>
 where
     F: Fn(&Cell) -> Key,
 {
     fn new(
-        matrix: &'a DancingLinksMatrix,
+        matrix: &'a DancingLinksMatrix<T>,
         start: Key,
         getter: F,
         include_start: bool,
-    ) -> CellIterator<'a, F> {
+    ) -> CellIterator<'a, F, T> {
         CellIterator {
             matrix,
             start,
@@ -365,7 +383,7 @@ where
     }
 }
 
-impl<'a, F> Iterator for CellIterator<'a, F>
+impl<'a, F, T: Eq> Iterator for CellIterator<'a, F, T>
 where
     F: Fn(&Cell) -> Key,
 {
@@ -391,8 +409,8 @@ where
     }
 }
 
-struct HeaderCellIterator<'a, F> {
-    matrix: &'a DancingLinksMatrix,
+struct HeaderCellIterator<'a, F, T> {
+    matrix: &'a DancingLinksMatrix<T>,
     start: HeaderKey,
     current: HeaderKey,
     getter: F,
@@ -400,16 +418,16 @@ struct HeaderCellIterator<'a, F> {
     include_start: bool,
 }
 
-impl<'a, F> HeaderCellIterator<'a, F>
+impl<'a, F, T> HeaderCellIterator<'a, F, T>
 where
     F: Fn(&Cell) -> Key,
 {
     fn new(
-        matrix: &'a DancingLinksMatrix,
+        matrix: &'a DancingLinksMatrix<T>,
         start: HeaderKey,
         getter: F,
         include_start: bool,
-    ) -> HeaderCellIterator<'a, F> {
+    ) -> HeaderCellIterator<'a, F, T> {
         HeaderCellIterator {
             matrix,
             start,
@@ -421,11 +439,11 @@ where
     }
 }
 
-impl<'a, F> Iterator for HeaderCellIterator<'a, F>
+impl<'a, F, T: Eq> Iterator for HeaderCellIterator<'a, F, T>
 where
     F: Fn(&Cell) -> Key,
 {
-    type Item = &'a HeaderCell;
+    type Item = &'a HeaderCell<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.end {
@@ -459,6 +477,7 @@ mod tests {
     use crate::builders::MatrixBuilder;
 
     use super::*;
+    use itertools::Itertools;
     use test_case::test_matrix;
     use HeaderName::First as F;
     use HeaderName::Other as O;
@@ -466,45 +485,50 @@ mod tests {
     #[test]
     fn test_locate_cell() {
         let matrix = build_matrix();
-        assert_eq!(matrix.locate_cell(1, 1).unwrap(), 4.into());
-        assert_eq!(matrix.locate_cell(1, 2).unwrap(), 5.into());
-        assert_eq!(matrix.locate_cell(1, 3), None);
-        assert_eq!(matrix.locate_cell(2, 1).unwrap(), 6.into());
-        assert_eq!(matrix.locate_cell(2, 2), None);
-        assert_eq!(matrix.locate_cell(2, 3).unwrap(), 7.into());
+        assert_eq!(matrix.locate_cell(1, "1").unwrap(), 4.into());
+        assert_eq!(matrix.locate_cell(1, "2").unwrap(), 5.into());
+        assert_eq!(matrix.locate_cell(1, "3"), None);
+        assert_eq!(matrix.locate_cell(2, "1").unwrap(), 6.into());
+        assert_eq!(matrix.locate_cell(2, "2"), None);
+        assert_eq!(matrix.locate_cell(2, "3").unwrap(), 7.into());
     }
 
     #[test]
     fn test_locate_header() {
         let matrix = build_matrix();
-        assert_eq!(matrix.locate_header(1).unwrap(), 1.into());
-        assert_eq!(matrix.locate_header(2).unwrap(), 2.into());
-        assert_eq!(matrix.locate_header(6), None);
+        assert_eq!(matrix.locate_header("1").unwrap(), 1.into());
+        assert_eq!(matrix.locate_header("2").unwrap(), 2.into());
+        assert_eq!(matrix.locate_header("6"), None);
     }
 
     #[test]
     fn test_iterator() {
         let matrix = build_matrix();
 
-        let mut it = matrix.iter_rows();
+        let mut it = matrix.iter_rows::<str>();
         assert_eq!(it.len(), 4);
-        assert_eq!(it.next().unwrap(), HashSet::from([1, 2]));
-        assert_eq!(it.next().unwrap(), HashSet::from([1, 3]));
-        assert_eq!(it.next().unwrap(), HashSet::from([2, 3]));
-        assert_eq!(it.next().unwrap(), HashSet::from([1, 2, 3]));
+
+        fn n<'a>(it: &'a mut RowIterator<String, str>) -> Vec<&'a str> {
+            it.next().unwrap().into_iter().sorted().collect_vec()
+        }
+
+        assert_eq!(n(&mut it), ["1", "2"]);
+        assert_eq!(n(&mut it), ["1", "3"]);
+        assert_eq!(n(&mut it), ["2", "3"]);
+        assert_eq!(n(&mut it), ["1", "2", "3"]);
         assert_eq!(it.next(), None);
     }
 
     #[test]
     fn test_iterator_no_rows() {
-        let matrix = MatrixBuilder
-            .add_column(1)
-            .add_column(2)
-            .add_column(3)
+        let matrix = MatrixBuilder::new()
+            .add_column("1")
+            .add_column("2")
+            .add_column("3")
             .end_columns()
             .build();
 
-        let mut it = matrix.iter_rows();
+        let mut it = matrix.iter_rows::<str>();
         assert_eq!(it.len(), 0);
         assert_eq!(it.next(), None);
     }
@@ -513,12 +537,12 @@ mod tests {
     fn test_header_cell_iterator_right_from_first(include_start: bool) {
         let matrix = build_matrix();
 
-        let actual: Vec<HeaderName> = matrix
+        let actual: Vec<HeaderName<_>> = matrix
             .iterate_headers(matrix.header_key, |cell| cell.right, include_start)
             .map(|h| h.name.clone())
             .collect();
 
-        let mut exp = vec![O(1), O(2), O(3)];
+        let mut exp = vec![O("1".to_string()), O("2".to_string()), O("3".to_string())];
         if include_start {
             exp.insert(0, F);
         }
@@ -529,16 +553,16 @@ mod tests {
     #[test_matrix([true, false]; "include_start")]
     fn test_header_cell_iterator_right(include_start: bool) {
         let matrix = build_matrix();
-        let key = matrix.locate_header(1).unwrap();
+        let key = matrix.locate_header("1").unwrap();
 
-        let actual: Vec<HeaderName> = matrix
+        let actual: Vec<HeaderName<_>> = matrix
             .iterate_headers(key, |cell| cell.right, include_start)
             .map(|h| h.name.clone())
             .collect();
 
-        let mut exp = vec![O(2), O(3), F];
+        let mut exp = vec![O("2".to_string()), O("3".to_string()), F];
         if include_start {
-            exp.insert(0, 1.into());
+            exp.insert(0, O("1".to_string()));
         }
 
         assert_eq!(actual, exp);
@@ -547,15 +571,15 @@ mod tests {
     #[test_matrix([true, false]; "include_start")]
     fn test_header_cell_iterator_left(include_start: bool) {
         let matrix = build_matrix();
-        let key = matrix.locate_header(1).unwrap();
+        let key = matrix.locate_header("1").unwrap();
 
-        let actual: Vec<HeaderName> = matrix
+        let actual: Vec<HeaderName<_>> = matrix
             .iterate_headers(key, |cell| cell.left, include_start)
             .map(|h| h.name.clone())
             .collect();
-        let mut exp = vec![F, O(3), O(2)];
+        let mut exp = vec![F, O("3".to_string()), O("2".to_string())];
         if include_start {
-            exp.insert(0, 1.into());
+            exp.insert(0, O("1".to_string()));
         }
 
         assert_eq!(actual, exp);
@@ -564,16 +588,16 @@ mod tests {
     #[test_matrix([true, false]; "include_start")]
     fn test_header_cell_iterator_up(include_start: bool) {
         let matrix = build_matrix();
-        let key = matrix.locate_header(1).unwrap();
+        let key = matrix.locate_header("1").unwrap();
 
-        let actual: Vec<HeaderName> = matrix
+        let actual: Vec<HeaderName<_>> = matrix
             .iterate_headers(key, |c| c.up, include_start)
             .map(|h| h.name.clone())
             .collect();
 
         let mut exp = vec![];
         if include_start {
-            exp.insert(0, 1.into());
+            exp.insert(0, O("1".to_string()));
         }
 
         assert_eq!(actual, exp);
@@ -582,16 +606,16 @@ mod tests {
     #[test_matrix([true, false]; "include_start")]
     fn test_header_cell_iterator_down(include_start: bool) {
         let matrix = build_matrix();
-        let key = matrix.locate_header(1).unwrap();
+        let key = matrix.locate_header("1").unwrap();
 
-        let actual: Vec<HeaderName> = matrix
+        let actual: Vec<HeaderName<_>> = matrix
             .iterate_headers(key, |c| c.down, include_start)
             .map(|h| h.name.clone())
             .collect();
 
         let mut exp = vec![];
         if include_start {
-            exp.insert(0, 1.into());
+            exp.insert(0, O("1".to_string()));
         }
 
         assert_eq!(actual, exp);
@@ -601,17 +625,17 @@ mod tests {
     fn test_cell_iterator_left(include_start: bool) {
         let matrix = build_matrix();
 
-        let key = matrix.locate_cell(4, 2).unwrap();
+        let key = matrix.locate_cell(4, "2").unwrap();
 
         let actual: Vec<_> = matrix
             .iterate_cells(key, |cell| cell.left, include_start)
             .map(|h| h.index)
             .collect();
 
-        let mut exp = vec![1, 3];
+        let mut exp = vec!["1", "3"];
 
         if include_start {
-            exp.insert(0, 2);
+            exp.insert(0, "2");
         }
 
         assert_eq!(
@@ -626,17 +650,17 @@ mod tests {
     fn test_cell_iterator_right(include_start: bool) {
         let matrix = build_matrix();
 
-        let key = matrix.locate_cell(4, 2).unwrap();
+        let key = matrix.locate_cell(4, "2").unwrap();
 
         let actual: Vec<_> = matrix
             .iterate_cells(key, |cell| cell.right, include_start)
             .map(|h| h.index)
             .collect();
 
-        let mut exp = vec![3, 1];
+        let mut exp = vec!["3", "1"];
 
         if include_start {
-            exp.insert(0, 2);
+            exp.insert(0, "2");
         }
 
         assert_eq!(
@@ -651,7 +675,7 @@ mod tests {
     fn test_cell_iterator_up(include_start: bool) {
         let matrix = build_matrix();
 
-        let key = matrix.locate_cell(2, 1).unwrap();
+        let key = matrix.locate_cell(2, "1").unwrap();
 
         let actual: Vec<_> = matrix
             .iterate_cells(key, |cell| cell.up, include_start)
@@ -667,7 +691,7 @@ mod tests {
         assert_eq!(
             actual,
             exp.into_iter()
-                .map(|v| matrix.locate_cell(v, 1).unwrap())
+                .map(|v| matrix.locate_cell(v, "1").unwrap())
                 .collect::<Vec<_>>()
         );
     }
@@ -676,7 +700,7 @@ mod tests {
     fn test_cell_iterator_down(include_start: bool) {
         let matrix = build_matrix();
 
-        let key = matrix.locate_cell(1, 2).unwrap();
+        let key = matrix.locate_cell(1, "2").unwrap();
 
         let actual: Vec<_> = matrix
             .iterate_cells(key, |cell| cell.down, include_start)
@@ -692,21 +716,25 @@ mod tests {
         assert_eq!(
             actual,
             exp.into_iter()
-                .map(|v| matrix.locate_cell(v, 2).unwrap())
+                .map(|v| matrix.locate_cell(v, "2").unwrap())
                 .collect::<Vec<_>>()
         );
     }
 
-    fn build_matrix() -> DancingLinksMatrix {
-        MatrixBuilder
-            .add_column(1)
-            .add_column(2)
-            .add_column(3)
+    fn build_matrix() -> DancingLinksMatrix<String> {
+        fn r<const N: usize>(v: [&str; N]) -> Vec<String> {
+            v.iter().map(|v| v.to_string()).collect()
+        }
+
+        MatrixBuilder::new()
+            .add_column(1.to_string())
+            .add_column(2.to_string())
+            .add_column(3.to_string())
             .end_columns()
-            .add_sorted_row(&[1, 2])
-            .add_sorted_row(&[1, 3])
-            .add_sorted_row(&[2, 3])
-            .add_sorted_row(&[1, 2, 3])
+            .add_sorted_row(r(["1", "2"]))
+            .add_sorted_row(r(["1", "3"]))
+            .add_sorted_row(r(["2", "3"]))
+            .add_sorted_row(r(["1", "2", "3"]))
             .build()
     }
 }
