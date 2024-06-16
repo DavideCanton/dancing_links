@@ -40,19 +40,6 @@ type HeaderCell = _HeaderCell<Key, HeaderKey>;
 pub struct MatrixBuilder;
 
 impl MatrixBuilder {
-    pub fn from_iterable<I: Into<ColumnSpec>, IT: Iterator<Item = I>>(
-        mut iterable: IT,
-    ) -> MatrixColBuilder {
-        let col = iterable.next().unwrap();
-        let mut builder = MatrixColBuilder::new().add_column(col);
-
-        for col in iterable {
-            builder = builder.add_column(col);
-        }
-
-        builder
-    }
-
     pub fn from_iterable_end<I: Into<ColumnSpec>, IT: Iterator<Item = I>>(
         mut iterable: IT,
     ) -> MatrixRowBuilder {
@@ -68,6 +55,20 @@ impl MatrixBuilder {
 
     pub fn add_column<I: Into<ColumnSpec>>(self, spec: I) -> MatrixColBuilder {
         MatrixColBuilder::new().add_column(spec)
+    }
+}
+
+impl<I: Into<ColumnSpec>> FromIterator<I> for MatrixColBuilder {
+    fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
+        let mut iter = iter.into_iter();
+        let col = iter.next().unwrap();
+        let mut builder = MatrixColBuilder::new().add_column(col);
+
+        for col in iter {
+            builder = builder.add_column(col);
+        }
+
+        builder
     }
 }
 
