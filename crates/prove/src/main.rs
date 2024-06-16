@@ -1,10 +1,6 @@
 #![allow(dead_code)]
 
-use matrix::MatrixBuilder;
-
-mod cells;
-mod keys;
-mod matrix;
+use dancing_links_matrix::MatrixBuilder;
 
 fn main() {
     let mut matrix = MatrixBuilder::from_iterable(1..=5)

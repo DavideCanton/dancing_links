@@ -1,15 +1,12 @@
 use slab::Slab;
-use std::{
-    collections::HashSet,
-    fmt::{self},
-};
+use std::{collections::HashSet, fmt};
 
 use crate::cells::{Cell as _Cell, CellRow, HeaderCell as _HeaderCell, HeaderName};
 use crate::keys::{HeaderKey, Key};
 
 pub struct ColumnSpec {
-    name: usize,
-    primary: bool,
+    pub(crate) name: usize,
+    pub(crate) primary: bool,
 }
 
 impl ColumnSpec {
@@ -37,151 +34,12 @@ impl From<usize> for ColumnSpec {
 type Cell = _Cell<Key, HeaderKey>;
 type HeaderCell = _HeaderCell<Key, HeaderKey>;
 
-pub struct MatrixBuilder;
-
-impl MatrixBuilder {
-    pub fn from_iterable<I: Into<ColumnSpec>, IT: IntoIterator<Item = I>>(
-        iterable: IT,
-    ) -> MatrixRowBuilder {
-        iterable.into_iter().collect::<MatrixRowBuilder>()
-    }
-
-    pub fn add_column<I: Into<ColumnSpec>>(self, spec: I) -> MatrixColBuilder {
-        MatrixColBuilder::new().add_column(spec)
-    }
-}
-
-pub struct MatrixColBuilder {
-    columns: Vec<ColumnSpec>,
-}
-
-impl<I: Into<ColumnSpec>> FromIterator<I> for MatrixColBuilder {
-    fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
-        let iter = iter.into_iter();
-
-        let mut builder = MatrixColBuilder::new();
-        for col in iter {
-            builder = builder.add_column(col);
-        }
-
-        builder
-    }
-}
-
-impl MatrixColBuilder {
-    fn new() -> MatrixColBuilder {
-        MatrixColBuilder { columns: vec![] }
-    }
-
-    pub fn add_column<I: Into<ColumnSpec>>(mut self, spec: I) -> MatrixColBuilder {
-        self.columns.push(spec.into());
-        self
-    }
-
-    pub fn end_columns(self) -> MatrixRowBuilder {
-        if self.columns.is_empty() {
-            panic!("No columns were added");
-        }
-        let column_names = self.columns;
-
-        let headers = Slab::with_capacity(column_names.len());
-        let mut matrix = DancingLinksMatrix {
-            header_key: headers.vacant_key().into(),
-            rows: 0,
-            columns: column_names.len(),
-            headers,
-            cells: Slab::with_capacity(column_names.len() * 5),
-        };
-
-        let (header_key, header_cell_key) = matrix.add_header(HeaderName::First);
-        matrix.header_key = header_key;
-
-        let mut prev_cell_key = header_cell_key;
-
-        for spec in column_names {
-            let primary = spec.primary;
-            let (_, cell_key) = matrix.add_header(HeaderName::Other(spec.name));
-
-            if primary {
-                matrix.link_right(prev_cell_key, cell_key);
-                prev_cell_key = cell_key;
-            }
-        }
-
-        matrix.link_right(prev_cell_key, header_cell_key);
-
-        MatrixRowBuilder { matrix }
-    }
-}
-
-pub struct MatrixRowBuilder {
-    matrix: DancingLinksMatrix,
-}
-
-impl<I: Into<ColumnSpec>> FromIterator<I> for MatrixRowBuilder {
-    fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
-        iter.into_iter().collect::<MatrixColBuilder>().end_columns()
-    }
-}
-
-impl MatrixRowBuilder {
-    pub fn add_row(self, row: &[usize]) -> Self {
-        let mut sorted = row.to_vec();
-        sorted.sort_unstable();
-        self.add_sorted_row(&sorted)
-    }
-
-    pub fn add_sorted_row(mut self, row: &[usize]) -> Self {
-        let mx = &mut self.matrix;
-
-        let mut cell_index = None;
-        let mut prev_index = None;
-        let mut start_index = None;
-
-        for ind in row.iter() {
-            // TODO check if ind is valid
-            let header_key = HeaderKey::from(*ind);
-
-            let in_cell_index = mx.add_cell(header_key, CellRow::Data(mx.rows + 1));
-            cell_index = Some(in_cell_index);
-
-            match prev_index {
-                Some(prev_index) => {
-                    mx.link_right(prev_index, in_cell_index);
-                }
-                None => {
-                    start_index = cell_index;
-                }
-            }
-
-            let header = mx.header_mut(header_key);
-            let header_cell_index = header.cell;
-            header.size += 1;
-            let last = mx.cell_mut(header_cell_index).up;
-
-            mx.link_down(in_cell_index, header_cell_index);
-            mx.link_down(last, in_cell_index);
-
-            prev_index = cell_index;
-        }
-
-        mx.link_right(cell_index.unwrap(), start_index.unwrap());
-
-        mx.rows += 1;
-        self
-    }
-
-    pub fn build(self) -> DancingLinksMatrix {
-        self.matrix
-    }
-}
-
 pub struct DancingLinksMatrix {
-    header_key: HeaderKey,
-    rows: usize,
-    columns: usize,
-    headers: Slab<HeaderCell>,
-    cells: Slab<Cell>,
+    pub(crate) header_key: HeaderKey,
+    pub(crate) rows: usize,
+    pub(crate) columns: usize,
+    pub(crate) headers: Slab<HeaderCell>,
+    pub(crate) cells: Slab<Cell>,
 }
 
 impl DancingLinksMatrix {
@@ -189,13 +47,13 @@ impl DancingLinksMatrix {
         RowIterator::new(self)
     }
 
-    pub fn min_column(&self) -> Option<&HeaderCell> {
+    pub(crate) fn min_column(&self) -> Option<&HeaderCell> {
         self.iterate_headers(self.header_key, |h| h.right, false)
             .min_by_key(|h| h.size)
     }
 
     #[cfg(feature = "random")]
-    pub fn random_column(&self) -> Option<&HeaderCell> {
+    pub(crate) fn random_column(&self) -> Option<&HeaderCell> {
         use rand::{thread_rng, Rng};
 
         if self.columns == 0 {
@@ -304,7 +162,7 @@ impl DancingLinksMatrix {
         HeaderCellIterator::new(self, start, getter, include_start)
     }
 
-    fn add_cell(&mut self, header_cell_key: HeaderKey, row: CellRow) -> Key {
+    pub(crate) fn add_cell(&mut self, header_cell_key: HeaderKey, row: CellRow) -> Key {
         let cell_key = self.cells.vacant_key().into();
         let cell = Cell::new(cell_key, header_cell_key, row);
         let actual_key = self.cells.insert(cell).into();
@@ -312,7 +170,7 @@ impl DancingLinksMatrix {
         actual_key
     }
 
-    fn add_header(&mut self, name: HeaderName) -> (HeaderKey, Key) {
+    pub(crate) fn add_header(&mut self, name: HeaderName) -> (HeaderKey, Key) {
         let header_key = self.headers.vacant_key().into();
         let header_cell_key = self.add_cell(header_key, CellRow::Header);
 
@@ -340,28 +198,28 @@ impl DancingLinksMatrix {
             .map(|h| h.index)
     }
 
-    fn cell(&self, key: Key) -> &Cell {
+    pub(crate) fn cell(&self, key: Key) -> &Cell {
         &self.cells[key.into()]
     }
 
-    fn cell_mut(&mut self, key: Key) -> &mut Cell {
+    pub(crate) fn cell_mut(&mut self, key: Key) -> &mut Cell {
         &mut self.cells[key.into()]
     }
 
-    fn header_mut(&mut self, key: HeaderKey) -> &mut HeaderCell {
+    pub(crate) fn header_mut(&mut self, key: HeaderKey) -> &mut HeaderCell {
         &mut self.headers[key.into()]
     }
 
-    fn header(&self, key: HeaderKey) -> &HeaderCell {
+    pub(crate) fn header(&self, key: HeaderKey) -> &HeaderCell {
         &self.headers[key.into()]
     }
 
-    fn link_right(&mut self, left: Key, right: Key) {
+    pub(crate) fn link_right(&mut self, left: Key, right: Key) {
         self.cell_mut(left).right = right;
         self.cell_mut(right).left = left;
     }
 
-    fn link_down(&mut self, up: Key, down: Key) {
+    pub(crate) fn link_down(&mut self, up: Key, down: Key) {
         self.cell_mut(up).down = down;
         self.cell_mut(down).up = up;
     }
@@ -598,6 +456,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::builders::MatrixBuilder;
+
     use super::*;
     use test_case::test_matrix;
     use HeaderName::First as F;

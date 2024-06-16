@@ -1,10 +1,10 @@
 use std::fmt;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct Key(usize);
+pub struct Key(usize);
 
 impl fmt::Display for Key {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
@@ -22,7 +22,7 @@ impl From<Key> for usize {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct HeaderKey(usize);
+pub struct HeaderKey(usize);
 
 impl fmt::Display for HeaderKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

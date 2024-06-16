@@ -1,0 +1,7 @@
+[package]
+name = "prove"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dancing_links_matrix = { path = "../dancing_links_matrix" }
