@@ -72,14 +72,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prove"
-version = "0.1.0"
-dependencies = [
- "dancing_links_matrix",
- "itertools",
-]
-
-[[package]]
 name = "quote"
 version = "1.0.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -125,6 +117,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f92a496fb766b417c996b9c5e57daf2f7ad3b0bebe1ccfca4856390e3d3bb67"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "sudoku"
+version = "0.1.0"
+dependencies = [
+ "dancing_links_matrix",
+ "itertools",
 ]
 
 [[package]]
