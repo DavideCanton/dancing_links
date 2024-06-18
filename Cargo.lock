@@ -76,6 +76,7 @@ name = "prove"
 version = "0.1.0"
 dependencies = [
  "dancing_links_matrix",
+ "itertools",
 ]
 
 [[package]]

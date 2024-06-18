@@ -1,3 +1,6 @@
 [workspace]
 members = ["crates/dancing_links_matrix", "crates/prove"]
 resolver = "2"
+
+[workspace.dependencies]
+itertools = "0.13.0"

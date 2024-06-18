@@ -5,6 +5,7 @@ use slab::Slab;
 
 use crate::{
     cells::{CellRow, HeaderName},
+    keys::HeaderKey,
     matrix::{ColumnSpec, DancingLinksMatrix},
 };
 
@@ -108,6 +109,12 @@ impl<T: Eq, I: Into<ColumnSpec<T>>> FromIterator<I> for MatrixRowBuilder<T> {
 }
 
 impl<T: Eq + Ord + Clone> MatrixRowBuilder<T> {
+    pub fn add_row_key<IT: IntoIterator<Item = usize>>(self, row: IT) -> Self {
+        let mut sorted = row.into_iter().collect_vec();
+        sorted.sort_unstable();
+        self.add_sorted_row_key(sorted)
+    }
+
     pub fn add_row<IT: IntoIterator<Item = T>>(self, row: IT) -> Self {
         let mut sorted = row.into_iter().collect_vec();
         sorted.sort_unstable();
@@ -116,7 +123,33 @@ impl<T: Eq + Ord + Clone> MatrixRowBuilder<T> {
 }
 
 impl<T: Eq> MatrixRowBuilder<T> {
-    pub fn add_sorted_row<IT: IntoIterator<Item = T>>(mut self, row: IT) -> Self {
+    pub fn add_sorted_row_key<IT: IntoIterator<Item = usize>>(self, row: IT) -> Self {
+        self.add_sorted_row_fn(row, |_mx, v| v.into())
+    }
+
+    pub fn add_sorted_row<IT: IntoIterator<Item = T>>(self, row: IT) -> Self {
+        self.add_sorted_row_fn(row, |mx, v| {
+            mx.headers
+                .iter()
+                .map(|h| h.1)
+                .find(|h| match h.name {
+                    HeaderName::First => false,
+                    HeaderName::Other(ref c) => *c == v,
+                })
+                .unwrap()
+                .index
+        })
+    }
+
+    fn add_sorted_row_fn<
+        U,
+        F: Fn(&mut DancingLinksMatrix<T>, U) -> HeaderKey,
+        IT: IntoIterator<Item = U>,
+    >(
+        mut self,
+        row: IT,
+        fun: F,
+    ) -> Self {
         let mx = &mut self.matrix;
 
         let mut cell_index = None;
@@ -125,16 +158,7 @@ impl<T: Eq> MatrixRowBuilder<T> {
 
         for ind in row {
             // TODO check if ind is valid
-            let header_key = mx
-                .headers
-                .iter()
-                .map(|h| h.1)
-                .find(|h| match h.name {
-                    HeaderName::First => false,
-                    HeaderName::Other(ref c) => *c == ind,
-                })
-                .unwrap()
-                .index;
+            let header_key = fun(mx, ind);
 
             let in_cell_index = mx.add_cell(header_key, CellRow::Data(mx.rows + 1));
             cell_index = Some(in_cell_index);

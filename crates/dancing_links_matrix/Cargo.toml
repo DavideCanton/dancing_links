@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 rand = { version = "0.8.5", optional = true }
 slab = "0.4.9"
-itertools = "0.13.0"
+itertools.workspace = true
 
 [dev-dependencies]
 test-case = "3.3.1"
@@ -14,4 +14,3 @@ test-case = "3.3.1"
 [features]
 default = ["random"]
 random = ["dep:rand"]
-
