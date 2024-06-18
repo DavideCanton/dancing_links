@@ -109,7 +109,10 @@ impl<T: Eq, I: Into<ColumnSpec<T>>> FromIterator<I> for MatrixRowBuilder<T> {
 }
 
 impl<T: Eq + Ord + Clone> MatrixRowBuilder<T> {
-    pub fn add_row_key<IT: IntoIterator<Item = usize>>(self, row: IT) -> Self {
+    pub fn add_row_key<Q: Into<HeaderKey> + Ord, IT: IntoIterator<Item = Q>>(
+        self,
+        row: IT,
+    ) -> Self {
         let mut sorted = row.into_iter().collect_vec();
         sorted.sort_unstable();
         self.add_sorted_row_key(sorted)
@@ -123,7 +126,10 @@ impl<T: Eq + Ord + Clone> MatrixRowBuilder<T> {
 }
 
 impl<T: Eq> MatrixRowBuilder<T> {
-    pub fn add_sorted_row_key<IT: IntoIterator<Item = usize>>(self, row: IT) -> Self {
+    pub fn add_sorted_row_key<Q: Into<HeaderKey>, IT: IntoIterator<Item = Q>>(
+        self,
+        row: IT,
+    ) -> Self {
         self.add_sorted_row_fn(row, |_mx, v| v.into())
     }
 

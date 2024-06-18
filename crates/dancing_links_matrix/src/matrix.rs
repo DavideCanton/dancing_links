@@ -183,6 +183,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
         (actual_header_key, header_cell_key)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn locate_cell<R: Into<CellRow>, C: Eq + ?Sized>(
         &self,
         row: R,
@@ -200,6 +201,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
             .map(|c| c.index)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn locate_header<C: Eq + ?Sized>(&self, column: &C) -> Option<HeaderKey>
     where
         T: AsRef<C>,

@@ -13,26 +13,31 @@ pub struct AlgorithmXSolver<F, T> {
     choose_min: bool,
     callback: F,
     stop: bool,
+    solution_found: bool,
 }
 
-type Solution<T> = HashMap<usize, Vec<T>>;
+pub struct Solution<T> {
+    pub solution_map: HashMap<usize, Vec<T>>,
+}
 
-impl<F: Fn(Solution<&T>) -> bool, T: Eq> AlgorithmXSolver<F, T> {
+impl<F: FnMut(&Solution<T>) -> bool, T: Eq + Clone> AlgorithmXSolver<F, T> {
     pub fn new(matrix: DancingLinksMatrix<T>, callback: F, choose_min: bool) -> Self {
         Self {
             matrix,
             choose_min,
             callback,
             stop: false,
+            solution_found: false,
         }
     }
 
-    pub fn solve(&mut self) {
+    pub fn solve(&mut self) -> bool {
         let mut sol_dict = HashMap::new();
         self.search(0, &mut sol_dict);
+        self.solution_found
     }
 
-    fn create_sol(&self, k: u32, sol_dict: &mut HashMap<u32, Key>) -> Solution<&T> {
+    fn create_sol(&self, k: u32, sol_dict: &HashMap<u32, Key>) -> Solution<T> {
         let mut sol = HashMap::new();
 
         for (key, row) in sol_dict.iter() {
@@ -45,7 +50,7 @@ impl<F: Fn(Solution<&T>) -> bool, T: Eq> AlgorithmXSolver<F, T> {
                 let r = self.matrix.header(r.header);
 
                 if let HeaderName::Other(ref name) = r.name {
-                    tmp_list.push(name);
+                    tmp_list.push(name.clone());
                 }
             }
 
@@ -55,7 +60,7 @@ impl<F: Fn(Solution<&T>) -> bool, T: Eq> AlgorithmXSolver<F, T> {
             }
         }
 
-        sol
+        Solution { solution_map: sol }
     }
 
     fn search(&mut self, k: u32, sol_dict: &mut HashMap<u32, Key>) {
@@ -63,9 +68,10 @@ impl<F: Fn(Solution<&T>) -> bool, T: Eq> AlgorithmXSolver<F, T> {
         let header_cell = self.matrix.cell(header.cell);
 
         if header_cell.right == header_cell.index {
+            self.solution_found = true;
             let sol = self.create_sol(k, sol_dict);
 
-            if (self.callback)(sol) {
+            if (self.callback)(&sol) {
                 self.stop = true;
             }
 

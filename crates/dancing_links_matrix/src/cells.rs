@@ -84,6 +84,7 @@ impl<T> HeaderCell<T> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_first(&self) -> bool {
         matches!(self.name, HeaderName::First)
     }

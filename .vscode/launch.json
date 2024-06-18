@@ -5,36 +5,23 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "lldb",
+            "type": "cppvsdbg",
             "request": "launch",
-            "name": "Debug executable 'dancing_links'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=dancing_links",
-                    "--package=dancing_links"
-                ],
-                "filter": {
-                    "name": "dancing_links",
-                    "kind": "bin"
-                }
-            },
+            "name": "Debug executable 'sudoku'",
+            "program": "${workspaceRoot}/target/debug/sudoku.exe",
             "args": [],
-            "cwd": "${workspaceFolder}"
+            "stopAtEntry": false,
+            "cwd": "${workspaceRoot}",
+            "environment": []
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'dancing_links'",
+            "name": "Debug unit tests in executable 'sudoku'",
             "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=dancing_links",
-                    "--package=dancing_links"
-                ],
+                "args": ["test", "--no-run", "--bin=sudoku"],
                 "filter": {
-                    "name": "dancing_links",
+                    "name": "sudoku",
                     "kind": "bin"
                 }
             },

@@ -1,6 +1,8 @@
 [workspace]
-members = ["crates/dancing_links_matrix", "crates/sudoku"]
+members = ["crates/dancing_links_matrix", "crates/sudoku", "crates/nqueens"]
 resolver = "2"
 
 [workspace.dependencies]
 itertools = "0.13.0"
+logging_timer = "1.1.1"
+simple_logger = "5.0.0"
