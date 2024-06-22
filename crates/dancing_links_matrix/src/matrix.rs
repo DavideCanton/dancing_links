@@ -247,7 +247,7 @@ impl<T: fmt::Display> fmt::Display for DancingLinksMatrix<T> {
 
         let mut is_first = true;
 
-        for (_, header) in self.headers.iter() {
+        for header in self.headers.iter() {
             if is_first {
                 is_first = false;
             } else {
@@ -267,7 +267,7 @@ impl<T: fmt::Display> fmt::Display for DancingLinksMatrix<T> {
         ));
         matrix.push('\n');
 
-        for (k, cell) in self.cells.iter() {
+        for cell in self.cells.iter() {
             if is_first {
                 is_first = false;
             } else {
@@ -276,7 +276,7 @@ impl<T: fmt::Display> fmt::Display for DancingLinksMatrix<T> {
 
             matrix.push_str(&format!(
                 "{:>4} {:>4} {:>4} {:>4} {:>4} {:>4} {:>4}",
-                k, cell.up, cell.down, cell.left, cell.right, cell.header, cell.row
+                cell.index, cell.up, cell.down, cell.left, cell.right, cell.header, cell.row
             ));
         }
         write!(f, "{}", matrix)

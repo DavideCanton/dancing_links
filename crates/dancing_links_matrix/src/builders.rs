@@ -1,3 +1,9 @@
+//! # Matrix Builder
+//!
+//! The builder is used to create a [`DancingLinksMatrix`].
+//!
+//! [`DancingLinksMatrix`]: crate::matrix::DancingLinksMatrix
+
 use std::marker::PhantomData;
 
 use itertools::Itertools;
@@ -9,19 +15,37 @@ use crate::{
     matrix::{ColumnSpec, DancingLinksMatrix},
 };
 
+/// A builder for a [`DancingLinksMatrix`].
+///
+/// Columns must be added to the matrix before the rows can be added.
+///
+/// [`DancingLinksMatrix`]: crate::matrix::DancingLinksMatrix
 pub struct MatrixBuilder<T>(PhantomData<T>);
 
 impl<T: Eq> MatrixBuilder<T> {
+    /// Create a new [`MatrixBuilder`].
+    ///
+    /// [`MatrixBuilder`]: MatrixBuilder
     pub fn new() -> MatrixBuilder<T> {
         MatrixBuilder(PhantomData)
     }
 
+    /// Create a new [`MatrixBuilder`] from an iterable of column specifications.
+    ///
+    /// Returns a [`MatrixRowBuilder`], that can be used to add rows to the matrix.
+    ///
+    /// [`MatrixBuilder`]: MatrixBuilder
     pub fn from_iterable<I: Into<ColumnSpec<T>>, IT: IntoIterator<Item = I>>(
         iterable: IT,
     ) -> MatrixRowBuilder<T> {
         iterable.into_iter().collect::<MatrixRowBuilder<T>>()
     }
 
+    /// Add a column to the matrix being built.
+    ///
+    /// Returns a [`MatrixColBuilder`], that can be used to add more columns to the matrix.
+    ///
+    /// [`MatrixBuilder`]: MatrixBuilder
     pub fn add_column<I: Into<ColumnSpec<T>>>(self, spec: I) -> MatrixColBuilder<T> {
         MatrixColBuilder::new().add_column(spec)
     }
@@ -55,11 +79,21 @@ impl<T: Eq> MatrixColBuilder<T> {
         MatrixColBuilder { columns: vec![] }
     }
 
+    /// Add a column to the matrix being built.
+    ///
+    /// Returns `self`, for chaining.
+    ///
+    /// [`MatrixColBuilder`]: MatrixColBuilder
     pub fn add_column<I: Into<ColumnSpec<T>>>(mut self, spec: I) -> MatrixColBuilder<T> {
         self.columns.push(spec.into());
         self
     }
 
+    /// Marks the ending of the phase of adding columns to the matrix.
+    ///
+    /// Returns a [`MatrixRowBuilder`], that can be used to add rows to the matrix.
+    ///
+    /// [`MatrixRowBuilder`]: MatrixRowBuilder
     pub fn end_columns(self) -> MatrixRowBuilder<T> {
         if self.columns.is_empty() {
             panic!("No columns were added");
@@ -72,7 +106,7 @@ impl<T: Eq> MatrixColBuilder<T> {
             rows: 0,
             columns: column_names.len(),
             headers,
-            cells: VecAllocator::with_capacity(column_names.len() * 5),
+            cells: VecAllocator::new(),
         };
 
         let (header_key, header_cell_key) = matrix.add_header(HeaderName::First);
@@ -108,8 +142,16 @@ impl<T: Eq, I: Into<ColumnSpec<T>>> FromIterator<I> for MatrixRowBuilder<T> {
     }
 }
 
-impl<T: Eq + Ord + Clone> MatrixRowBuilder<T> {
-    pub fn add_row_key<Q: Into<HeaderKey> + Ord, IT: IntoIterator<Item = Q>>(
+impl<T: Eq> MatrixRowBuilder<T> {
+    /// Add a row to the [`MatrixRowBuilder`] using key values.
+    ///
+    /// Keys must be of a type that is convertible into an usize, and must be in the range from 1 to `n`,
+    /// where `n` is the number of columns in the matrix, in the order that the columns were added.
+    ///
+    /// Use `add_sorted_row_key` if the keys are already sorted, to avoid sorting them twice.
+    ///
+    /// [`MatrixRowBuilder`]: MatrixRowBuilder
+    pub fn add_row_key<K: Into<HeaderKey> + Ord, IT: IntoIterator<Item = K>>(
         self,
         row: IT,
     ) -> Self {
@@ -118,53 +160,73 @@ impl<T: Eq + Ord + Clone> MatrixRowBuilder<T> {
         self.add_sorted_row_key(sorted)
     }
 
-    pub fn add_row<IT: IntoIterator<Item = T>>(self, row: IT) -> Self {
+    /// Add a row to the [`MatrixRowBuilder`].
+    ///
+    /// Use `add_sorted_row` if the values are already sorted, to avoid sorting them twice.
+    ///
+    /// [`MatrixRowBuilder`]: MatrixRowBuilder
+    pub fn add_row<IT: IntoIterator<Item = T>>(self, row: IT) -> Self
+    where
+        T: Ord,
+    {
         let mut sorted = row.into_iter().collect_vec();
         sorted.sort_unstable();
         self.add_sorted_row(sorted)
     }
-}
 
-impl<T: Eq> MatrixRowBuilder<T> {
-    pub fn add_sorted_row_key<Q: Into<HeaderKey>, IT: IntoIterator<Item = Q>>(
+    /// Add a sorted row to the [`MatrixRowBuilder`] using key values.
+    ///
+    /// Keys must be of a type that is convertible into an usize, and must be in the range from 1 to `n`,
+    /// where `n` is the number of columns in the matrix, in the order that the columns were added.
+    ///
+    /// [`MatrixRowBuilder`]: MatrixRowBuilder
+    pub fn add_sorted_row_key<K: Into<HeaderKey>, IT: IntoIterator<Item = K>>(
         self,
         row: IT,
     ) -> Self {
-        self.add_sorted_row_fn(row, |_mx, v| v.into())
+        self._add_sorted_row(row.into_iter().map(|v| v.into()))
     }
 
+    /// Add a sorted row to the [`MatrixRowBuilder`].
+    ///
+    /// [`MatrixRowBuilder`]: MatrixRowBuilder
     pub fn add_sorted_row<IT: IntoIterator<Item = T>>(self, row: IT) -> Self {
-        self.add_sorted_row_fn(row, |mx, v| {
-            mx.headers
-                .iter()
-                .map(|h| h.1)
-                .find(|h| match h.name {
-                    HeaderName::First => false,
-                    HeaderName::Other(ref c) => *c == v,
-                })
-                .unwrap()
-                .index
-        })
+        let mut to_add = Vec::new();
+
+        {
+            let mut headers_iter = self.matrix.headers.iter();
+
+            for val in row {
+                let mut added = false;
+                for header in headers_iter.by_ref() {
+                    if let HeaderName::Other(name) = &header.name {
+                        if *name == val {
+                            to_add.push(header.index);
+                            added = true;
+                            break;
+                        }
+                    }
+                }
+
+                if !added {
+                    // TODO improve
+                    panic!("Column not found");
+                }
+            }
+        }
+
+        self._add_sorted_row(to_add)
     }
 
-    fn add_sorted_row_fn<
-        U,
-        F: Fn(&mut DancingLinksMatrix<T>, U) -> HeaderKey,
-        IT: IntoIterator<Item = U>,
-    >(
-        mut self,
-        row: IT,
-        fun: F,
-    ) -> Self {
+    fn _add_sorted_row<IT: IntoIterator<Item = HeaderKey>>(mut self, row: IT) -> Self {
         let mx = &mut self.matrix;
 
         let mut cell_index = None;
         let mut prev_index = None;
         let mut start_index = None;
 
-        for ind in row {
+        for header_key in row {
             // TODO check if ind is valid
-            let header_key = fun(mx, ind);
 
             let in_cell_index = mx.add_cell(header_key, CellRow::Data(mx.rows + 1));
             cell_index = Some(in_cell_index);
