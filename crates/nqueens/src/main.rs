@@ -1,3 +1,5 @@
+use std::env::args;
+
 use dancing_links_matrix::{
     AlgorithmXSolver, ColumnSpec, DancingLinksMatrix, MatrixBuilder, Solution,
 };
@@ -78,7 +80,11 @@ fn solve(matrix: DancingLinksMatrix<String>, n: usize) {
 fn main() {
     simple_logger::init_with_level(Level::Debug).unwrap();
 
-    let n = 8;
+    let n = args()
+        .nth(1)
+        .map(|v| v.parse::<usize>().expect("Invalid size"))
+        .unwrap_or(8);
+
     let matrix = build_matrix(n);
     solve(matrix, n);
 }

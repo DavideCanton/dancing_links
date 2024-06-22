@@ -1,8 +1,8 @@
-use slab::Slab;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::{collections::HashSet, fmt};
 
+use crate::allocator::{Allocator, VecAllocator};
 use crate::cells::{Cell, CellRow, HeaderCell, HeaderName};
 use crate::keys::{HeaderKey, Key};
 
@@ -37,8 +37,8 @@ pub struct DancingLinksMatrix<T> {
     pub(crate) header_key: HeaderKey,
     pub(crate) rows: usize,
     pub(crate) columns: usize,
-    pub(crate) headers: Slab<HeaderCell<T>>,
-    pub(crate) cells: Slab<Cell>,
+    pub(crate) headers: VecAllocator<HeaderCell<T>>,
+    pub(crate) cells: VecAllocator<Cell>,
 }
 
 impl<T: Eq> DancingLinksMatrix<T> {
@@ -165,7 +165,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
     }
 
     pub(crate) fn add_cell(&mut self, header_cell_key: HeaderKey, row: CellRow) -> Key {
-        let cell_key = self.cells.vacant_key().into();
+        let cell_key = self.cells.next_key().into();
         let cell = Cell::new(cell_key, header_cell_key, row);
         let actual_key = self.cells.insert(cell).into();
         assert_eq!(actual_key, cell_key);
@@ -173,7 +173,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
     }
 
     pub(crate) fn add_header(&mut self, name: HeaderName<T>) -> (HeaderKey, Key) {
-        let header_key = self.headers.vacant_key().into();
+        let header_key = self.headers.next_key().into();
         let header_cell_key = self.add_cell(header_key, CellRow::Header);
 
         let header = HeaderCell::new(name, header_key, header_cell_key);

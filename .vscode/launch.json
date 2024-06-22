@@ -7,12 +7,18 @@
         {
             "type": "cppvsdbg",
             "request": "launch",
-            "name": "Debug executable 'sudoku'",
+            "name": "Debug executable 'sudoku' on windows",
             "program": "${workspaceRoot}/target/debug/sudoku.exe",
             "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceRoot}",
-            "environment": []
+            "cwd": "${workspaceRoot}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'sudoku' on linux",
+            "program": "${workspaceRoot}/target/debug/sudoku",
+            "args": [],
+            "cwd": "${workspaceRoot}"
         },
         {
             "type": "lldb",

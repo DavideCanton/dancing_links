@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
 use itertools::Itertools;
-use slab::Slab;
 
 use crate::{
+    allocator::{Allocator, VecAllocator},
     cells::{CellRow, HeaderName},
     keys::HeaderKey,
     matrix::{ColumnSpec, DancingLinksMatrix},
@@ -66,13 +66,13 @@ impl<T: Eq> MatrixColBuilder<T> {
         }
         let column_names = self.columns;
 
-        let headers = Slab::with_capacity(column_names.len());
+        let headers = VecAllocator::with_capacity(column_names.len());
         let mut matrix = DancingLinksMatrix {
-            header_key: headers.vacant_key().into(),
+            header_key: headers.next_key().into(),
             rows: 0,
             columns: column_names.len(),
             headers,
-            cells: Slab::with_capacity(column_names.len() * 5),
+            cells: VecAllocator::with_capacity(column_names.len() * 5),
         };
 
         let (header_key, header_cell_key) = matrix.add_header(HeaderName::First);
