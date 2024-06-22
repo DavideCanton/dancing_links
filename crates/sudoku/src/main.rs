@@ -1,4 +1,11 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    env::args,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use dancing_links_matrix::{AlgorithmXSolver, DancingLinksMatrix, MatrixBuilder, Solution};
 use itertools::Itertools;
@@ -129,35 +136,46 @@ fn build_matrix(
     matrix_builder.build()
 }
 
-fn load_board() -> HashMap<(usize, usize), usize> {
-    let mut known: HashMap<(usize, usize), usize> = HashMap::new();
-    known.insert((1, 4), 9);
-    known.insert((1, 8), 4);
-    known.insert((1, 9), 8);
-    known.insert((2, 4), 1);
-    known.insert((2, 6), 8);
-    known.insert((2, 9), 9);
-    known.insert((3, 3), 9);
-    known.insert((4, 5), 6);
-    known.insert((4, 7), 1);
-    known.insert((4, 8), 9);
-    known.insert((5, 3), 6);
-    known.insert((6, 4), 8);
-    known.insert((6, 6), 9);
-    known.insert((6, 9), 6);
-    known.insert((7, 6), 6);
-    known.insert((7, 8), 8);
-    known.insert((8, 5), 8);
-    known.insert((9, 3), 8);
-    known.insert((9, 5), 7);
-    known.insert((9, 7), 6);
-    known
+fn load_board(path: &Path) -> HashMap<(usize, usize), usize> {
+    let mut map = HashMap::new();
+
+    let mut reader = BufReader::new(File::open(path).expect("Failed to open file"));
+
+    let mut line_buf = String::with_capacity(11);
+
+    for i in 1..=9 {
+        reader
+            .read_line(&mut line_buf)
+            .expect("Failed to read line");
+
+        for (j, c) in line_buf.chars().enumerate() {
+            if j == 9 {
+                break;
+            }
+
+            if c != '.' {
+                map.insert((i, j + 1), c.to_digit(10).unwrap() as usize);
+            }
+        }
+        line_buf.clear();
+    }
+
+    map
 }
 
 fn main() {
     simple_logger::init_with_level(Level::Debug).unwrap();
 
-    let known = load_board();
+    let path = args()
+        .nth(1)
+        .map(|v| PathBuf::from_str(&v).expect("Invalid path"))
+        .expect("Path not specified");
+
+    if !path.is_file() {
+        panic!("Not a file");
+    }
+
+    let known = load_board(&path);
 
     let matrix = build_matrix(known);
 
