@@ -96,12 +96,8 @@ impl<T: Eq> DancingLinksMatrix<T> {
             let cell_u_index = cell.up;
             let cell_header = cell.header;
 
-            let cell_d = self.cell_mut(cell_d_index);
-            cell_d.up = cell_u_index;
-
-            let cell_u = self.cell_mut(cell_u_index);
-            cell_u.down = cell_d_index;
-
+            self.cell_mut(cell_d_index).up = cell_u_index;
+            self.cell_mut(cell_u_index).down = cell_d_index;
             self.header_mut(cell_header).size -= 1;
         }
     }
@@ -125,12 +121,8 @@ impl<T: Eq> DancingLinksMatrix<T> {
             let cell_index = cell.index;
             let cell_header = cell.header;
 
-            let cell_d = self.cell_mut(cell_d_index);
-            cell_d.up = cell_index;
-
-            let cell_u = self.cell_mut(cell_u_index);
-            cell_u.down = cell_index;
-
+            self.cell_mut(cell_d_index).up = cell_index;
+            self.cell_mut(cell_u_index).down = cell_index;
             self.header_mut(cell_header).size += 1;
         }
 
