@@ -39,6 +39,7 @@ pub struct DancingLinksMatrix<T> {
     pub(crate) columns: usize,
     pub(crate) headers: VecAllocator<HeaderCell<T>>,
     pub(crate) cells: VecAllocator<Cell>,
+    pub(crate) average_row_size: usize,
 }
 
 impl<T: Eq> DancingLinksMatrix<T> {
@@ -81,7 +82,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
         let header_l = self.cell_mut(header_l_index);
         header_l.right = header_r_index;
 
-        let mut v = Vec::new();
+        let mut v = Vec::with_capacity(self.rows * self.average_row_size);
 
         for i in self.iterate_cells(header_cell_index, |c| c.down, false) {
             for j in self.iterate_cells(i.index, |c| c.right, false) {
@@ -105,7 +106,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
     pub fn uncover(&mut self, key: HeaderKey) {
         let header_cell_index = self.header(key).cell;
 
-        let mut v = Vec::new();
+        let mut v = Vec::with_capacity(self.rows * self.average_row_size);
 
         for i in self.iterate_cells(header_cell_index, |c| c.up, false) {
             for j in self.iterate_cells(i.index, |c| c.left, false) {

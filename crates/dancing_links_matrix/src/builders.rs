@@ -107,6 +107,7 @@ impl<T: Eq> MatrixColBuilder<T> {
             columns: column_names.len(),
             headers,
             cells: VecAllocator::new(),
+            average_row_size: 0,
         };
 
         let (header_key, header_cell_key) = matrix.add_header(HeaderName::First);
@@ -258,6 +259,9 @@ impl<T: Eq> MatrixRowBuilder<T> {
     }
 
     pub fn build(self) -> DancingLinksMatrix<T> {
-        self.matrix
+        let mut matrix = self.matrix;
+        matrix.average_row_size = matrix.cells.len() / matrix.rows;
+
+        matrix
     }
 }
