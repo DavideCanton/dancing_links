@@ -4,7 +4,7 @@ use std::fmt;
 pub struct Key(usize);
 
 impl fmt::Display for Key {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }

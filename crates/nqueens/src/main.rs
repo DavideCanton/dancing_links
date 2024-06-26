@@ -48,9 +48,9 @@ fn sol_callback(n: usize, sol: &Solution<String>) -> bool {
     }
 
     for i in 0..n {
-        let mut r = vec![" "; n];
-        r[pos[i]] = "O";
-        println!("|{}|", r.join("|"));
+        let mut r = vec![' '; n];
+        r[pos[i]] = 'O';
+        println!("|{}|", r.into_iter().join("|"));
     }
 
     true
