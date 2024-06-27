@@ -260,7 +260,11 @@ impl<T: Eq> MatrixRowBuilder<T> {
 
     pub fn build(self) -> DancingLinksMatrix<T> {
         let mut matrix = self.matrix;
-        matrix.average_row_size = matrix.cells.len() / matrix.rows;
+        matrix.average_row_size = if matrix.rows == 0 {
+            0
+        } else {
+            matrix.cells.len() / matrix.rows
+        };
 
         matrix
     }

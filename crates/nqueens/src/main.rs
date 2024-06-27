@@ -70,7 +70,7 @@ fn build_matrix(n: usize) -> DancingLinksMatrix<String> {
 
 #[time]
 fn solve(matrix: DancingLinksMatrix<String>, n: usize) {
-    let mut solver = AlgorithmXSolver::new(matrix, |s| sol_callback(n, s), true);
+    let mut solver = AlgorithmXSolver::new(matrix, move |s| sol_callback(n, s), true);
 
     if !solver.solve() {
         println!("No solution found");
