@@ -57,7 +57,7 @@ fn compute_row(mut i: usize, mut j: usize, mut v: usize) -> Vec<usize> {
 
 const M: usize = 20;
 
-fn print_sol(sol: &Solution<String>) {
+fn print_sol(sol: Solution<String>) {
     let mut matrix = vec![0; 81];
 
     for v in sol.solution_map.values() {
@@ -108,10 +108,14 @@ fn print_sol(sol: &Solution<String>) {
 fn solve(matrix: DancingLinksMatrix<String>) {
     let mut solver = IterativeAlgorithmXSolver::new(matrix, true, true);
     let solutions = solver.solve();
-    if solutions.is_empty() {
-        println!("No solution found");
-    } else {
-        print_sol(&solutions[0]);
+
+    match solutions.into_iter().next() {
+        None => {
+            println!("No solution found");
+        }
+        Some(sol) => {
+            print_sol(sol);
+        }
     }
 }
 

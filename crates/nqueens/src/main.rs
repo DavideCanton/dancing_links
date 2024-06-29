@@ -1,7 +1,7 @@
 use std::env::args;
 
 use dancing_links_matrix::{
-    RecursiveAlgorithmXSolver, ColumnSpec, DancingLinksMatrix, MatrixBuilder, Solution,
+    ColumnSpec, DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder,
 };
 use itertools::Itertools;
 use logging_timer::{time, Level};
@@ -36,26 +36,6 @@ fn compute_row(i: usize, j: usize, n: usize) -> Vec<usize> {
         .collect()
 }
 
-fn sol_callback(n: usize, sol: &Solution<String>) -> bool {
-    let mut pos = vec![0; n];
-
-    for v in sol.solution_map.values() {
-        let mut v = v.clone();
-        v.sort();
-        let c = v[2][1..].parse::<usize>().unwrap();
-        let r = v[3][1..].parse::<usize>().unwrap();
-        pos[r] = c;
-    }
-
-    for i in 0..n {
-        let mut r = vec![' '; n];
-        r[pos[i]] = 'O';
-        println!("|{}|", r.into_iter().join("|"));
-    }
-
-    true
-}
-
 #[time]
 fn build_matrix(n: usize) -> DancingLinksMatrix<String> {
     let mut matrix_builder = MatrixBuilder::from_iterable(names(n));
@@ -70,10 +50,30 @@ fn build_matrix(n: usize) -> DancingLinksMatrix<String> {
 
 #[time]
 fn solve(matrix: DancingLinksMatrix<String>, n: usize) {
-    let mut solver = RecursiveAlgorithmXSolver::new(matrix, move |s| sol_callback(n, s), true);
+    let mut solver = IterativeAlgorithmXSolver::new(matrix, true, true);
+    let solutions = solver.solve();
 
-    if !solver.solve() {
-        println!("No solution found");
+    match solutions.into_iter().next() {
+        None => {
+            println!("No solution found");
+        }
+        Some(sol) => {
+            let mut pos = vec![0; n];
+
+            for v in sol.solution_map.values() {
+                let mut v = v.clone();
+                v.sort();
+                let c = v[2][1..].parse::<usize>().unwrap();
+                let r = v[3][1..].parse::<usize>().unwrap();
+                pos[r] = c;
+            }
+
+            for i in 0..n {
+                let mut r = vec![' '; n];
+                r[pos[i]] = 'O';
+                println!("|{}|", r.into_iter().join("|"));
+            }
+        }
     }
 }
 
