@@ -1,7 +1,7 @@
 use std::env::args;
 
 use dancing_links_matrix::{
-    AlgorithmXSolver, ColumnSpec, DancingLinksMatrix, MatrixBuilder, Solution,
+    RecursiveAlgorithmXSolver, ColumnSpec, DancingLinksMatrix, MatrixBuilder, Solution,
 };
 use itertools::Itertools;
 use logging_timer::{time, Level};
@@ -70,7 +70,7 @@ fn build_matrix(n: usize) -> DancingLinksMatrix<String> {
 
 #[time]
 fn solve(matrix: DancingLinksMatrix<String>, n: usize) {
-    let mut solver = AlgorithmXSolver::new(matrix, move |s| sol_callback(n, s), true);
+    let mut solver = RecursiveAlgorithmXSolver::new(matrix, move |s| sol_callback(n, s), true);
 
     if !solver.solve() {
         println!("No solution found");

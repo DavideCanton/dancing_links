@@ -7,7 +7,9 @@ use std::{
     str::FromStr,
 };
 
-use dancing_links_matrix::{AlgorithmXSolver, DancingLinksMatrix, MatrixBuilder, Solution};
+use dancing_links_matrix::{
+    DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder, Solution,
+};
 use itertools::Itertools;
 use logging_timer::{time, Level};
 
@@ -55,7 +57,7 @@ fn compute_row(mut i: usize, mut j: usize, mut v: usize) -> Vec<usize> {
 
 const M: usize = 20;
 
-fn sol_callback(sol: &Solution<String>) -> bool {
+fn print_sol(sol: &Solution<String>) {
     let mut matrix = vec![0; 81];
 
     for v in sol.solution_map.values() {
@@ -100,15 +102,16 @@ fn sol_callback(sol: &Solution<String>) -> bool {
         }
         println!();
     }
-    true
 }
 
 #[time]
 fn solve(matrix: DancingLinksMatrix<String>) {
-    let mut solver = AlgorithmXSolver::new(matrix, sol_callback, true);
-
-    if !solver.solve() {
+    let mut solver = IterativeAlgorithmXSolver::new(matrix, true, true);
+    let solutions = solver.solve();
+    if solutions.is_empty() {
         println!("No solution found");
+    } else {
+        print_sol(&solutions[0]);
     }
 }
 
