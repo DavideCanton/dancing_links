@@ -1,6 +1,9 @@
+use std::collections::HashMap;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::{collections::HashSet, fmt};
+
+use itertools::Itertools;
 
 use crate::allocator::{Allocator, VecAllocator};
 use crate::cells::{Cell, CellRow, HeaderCell, HeaderName};
@@ -85,8 +88,8 @@ impl<T: Eq> DancingLinksMatrix<T> {
         let mut v = Vec::with_capacity(self.rows * self.average_row_size);
 
         for i in self.iterate_cells(header_cell_index, |c| c.down, false) {
-            for j in self.iterate_cells(i.index, |c| c.right, false) {
-                v.push(j.index)
+            for j in self.iterate_cells(i.key, |c| c.right, false) {
+                v.push(j.key)
             }
         }
 
@@ -109,8 +112,8 @@ impl<T: Eq> DancingLinksMatrix<T> {
         let mut v = Vec::with_capacity(self.rows * self.average_row_size);
 
         for i in self.iterate_cells(header_cell_index, |c| c.up, false) {
-            for j in self.iterate_cells(i.index, |c| c.left, false) {
-                v.push(j.index)
+            for j in self.iterate_cells(i.key, |c| c.left, false) {
+                v.push(j.key)
             }
         }
 
@@ -119,7 +122,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
 
             let cell_d_index = cell.down;
             let cell_u_index = cell.up;
-            let cell_index = cell.index;
+            let cell_index = cell.key;
             let cell_header = cell.header;
 
             self.cell_mut(cell_d_index).up = cell_index;
@@ -191,7 +194,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
 
         self.iterate_cells(header.cell, |c| c.down, true)
             .find(|c| c.row == row)
-            .map(|c| c.index)
+            .map(|c| c.key)
     }
 
     #[allow(dead_code)]
@@ -204,7 +207,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
                 HeaderName::First => false,
                 HeaderName::Other(ref c) => *c.as_ref() == *column,
             })
-            .map(|h| h.index)
+            .map(|h| h.key)
     }
 
     pub(crate) fn cell(&self, key: Key) -> &Cell {
@@ -234,7 +237,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
     }
 }
 
-impl<T: fmt::Display> fmt::Display for DancingLinksMatrix<T> {
+impl<T: fmt::Debug + Eq> fmt::Debug for DancingLinksMatrix<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut matrix = String::new();
 
@@ -247,7 +250,7 @@ impl<T: fmt::Display> fmt::Display for DancingLinksMatrix<T> {
                 matrix.push(' ');
             }
 
-            matrix.push_str(&format!("{:>4}", header.name));
+            matrix.push_str(&format!("{:>4?}", header.name));
         }
 
         matrix.push('\n');
@@ -269,10 +272,42 @@ impl<T: fmt::Display> fmt::Display for DancingLinksMatrix<T> {
 
             matrix.push_str(&format!(
                 "{:>4} {:>4} {:>4} {:>4} {:>4} {:>4} {:>4}",
-                cell.index, cell.up, cell.down, cell.left, cell.right, cell.header, cell.row
+                cell.key, cell.up, cell.down, cell.left, cell.right, cell.header, cell.row
             ));
         }
         write!(f, "{}", matrix)
+    }
+}
+
+impl<T: fmt::Display + Eq> fmt::Display for DancingLinksMatrix<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut rows = vec![" ".repeat(self.headers.len() * 5); self.rows + 1];
+        let mut inds = HashMap::new();
+
+        for (i, header) in self
+            .iterate_headers(self.header_key, |c| c.right, true)
+            .enumerate()
+        {
+            let ind = i * 5;
+            inds.insert(header.key, ind);
+            rows[0].replace_range(ind..ind + 4, &format!("{:>4}", header.name));
+        }
+
+        for header in self.iterate_headers(self.header_key, |c| c.right, true) {
+            for c in self.iterate_cells(header.cell, |c| c.down, false) {
+                let header = c.header;
+                let ind = inds[&header];
+
+                let row: usize = c.row.into();
+                rows[row].replace_range(ind..ind + 4, &format!("{:>4}", c.key));
+            }
+        }
+
+        write!(
+            f,
+            "{}",
+            rows.into_iter().filter(|r| !r.trim().is_empty()).join("\n")
+        )
     }
 }
 

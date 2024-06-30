@@ -7,7 +7,7 @@ mod solver;
 
 pub use builders::MatrixBuilder;
 pub use matrix::{ColumnSpec, DancingLinksMatrix};
-pub use solver::{RecursiveAlgorithmXSolver, IterativeAlgorithmXSolver, Solution};
+pub use solver::{IterativeAlgorithmXSolver, RecursiveAlgorithmXSolver, Solution};
 
 #[cfg(test)]
 mod tests;

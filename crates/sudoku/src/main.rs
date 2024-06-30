@@ -171,7 +171,12 @@ fn load_board(path: &Path) -> HashMap<(usize, usize), usize> {
 }
 
 fn main() {
-    simple_logger::init_with_level(Level::Debug).unwrap();
+    let level = if cfg!(debug_assertions) {
+        Level::Debug
+    } else {
+        Level::Info
+    };
+    simple_logger::init_with_level(level).unwrap();
 
     let path = args()
         .nth(1)

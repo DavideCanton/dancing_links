@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 rand = { version = "0.8.5", optional = true }
 itertools.workspace = true
+log.workspace = true
 
 [dev-dependencies]
 test-case = "3.3.1"

@@ -1,10 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use itertools::Itertools;
+use log::debug;
 
 use crate::{
     cells::{CellRow, HeaderName},
-    keys::Key,
+    keys::{HeaderKey, Key},
     DancingLinksMatrix,
 };
 
@@ -37,7 +38,7 @@ impl<F: FnMut(&Solution<T>) -> bool, T: Eq + Clone> RecursiveAlgorithmXSolver<F,
         self.solution_found
     }
 
-    fn create_sol(&self, k: u32, sol_dict: &HashMap<u32, Key>) -> Solution<T> {
+    fn create_sol(&self, k: usize, sol_dict: &HashMap<usize, Key>) -> Solution<T> {
         let mut sol = HashMap::new();
 
         for (key, row) in sol_dict.iter() {
@@ -63,11 +64,13 @@ impl<F: FnMut(&Solution<T>) -> bool, T: Eq + Clone> RecursiveAlgorithmXSolver<F,
         Solution { solution_map: sol }
     }
 
-    fn search(&mut self, k: u32, sol_dict: &mut HashMap<u32, Key>) {
+    fn search(&mut self, k: usize, sol_dict: &mut HashMap<usize, Key>) {
+        // trace!("matrix:\n{}", self.matrix);
+
         let header = self.matrix.header(self.matrix.header_key);
         let header_cell = self.matrix.cell(header.cell);
 
-        if header_cell.right == header_cell.index {
+        if header_cell.right == header_cell.key {
             self.solution_found = true;
             let sol = self.create_sol(k, sol_dict);
 
@@ -85,25 +88,24 @@ impl<F: FnMut(&Solution<T>) -> bool, T: Eq + Clone> RecursiveAlgorithmXSolver<F,
         };
 
         let col_cell = start_col.cell;
-        let mut col = start_col.index;
+        let col = start_col.key;
 
         self.matrix.cover(col);
 
         let rows: Vec<_> = self
             .matrix
             .iterate_cells(col_cell, |cell| cell.down, false)
-            .map(|v| v.index)
+            .map(|v| v.key)
             .collect();
 
-        for row in rows {
-            sol_dict.insert(k, row);
+        if rows.is_empty() {
+            debug!("rows is empty");
+        }
 
-            self.matrix
-                .iterate_cells(row, |cell| cell.right, false)
-                .map(|v| v.header)
-                .collect_vec()
-                .into_iter()
-                .for_each(|j| self.matrix.cover(j));
+        for row in rows {
+            add_to_sol(&self.matrix, sol_dict, k, row, col);
+
+            cover_row(&mut self.matrix, row);
 
             self.search(k + 1, sol_dict);
 
@@ -111,18 +113,29 @@ impl<F: FnMut(&Solution<T>) -> bool, T: Eq + Clone> RecursiveAlgorithmXSolver<F,
                 return;
             }
 
-            col = self.matrix.cell(row).header;
-
-            self.matrix
-                .iterate_cells(row, |c| c.left, false)
-                .map(|v| v.header)
-                .collect_vec()
-                .into_iter()
-                .for_each(|j| self.matrix.uncover(j));
+            uncover_row(&mut self.matrix, row);
         }
 
         self.matrix.uncover(col)
     }
+}
+
+fn cover_row<T: Eq>(matrix: &mut DancingLinksMatrix<T>, row: Key) {
+    matrix
+        .iterate_cells(row, |cell| cell.right, false)
+        .map(|v| v.header)
+        .collect_vec()
+        .into_iter()
+        .for_each(|j| matrix.cover(j));
+}
+
+fn uncover_row<T: Eq>(matrix: &mut DancingLinksMatrix<T>, row: Key) {
+    matrix
+        .iterate_cells(row, |c| c.left, false)
+        .map(|v| v.header)
+        .collect_vec()
+        .into_iter()
+        .for_each(|j| matrix.uncover(j));
 }
 
 pub struct IterativeAlgorithmXSolver<T> {
@@ -195,12 +208,15 @@ impl<T: Eq + Clone> IterativeAlgorithmXSolver<T> {
         let mut stack = vec![Root];
 
         while let Some(elem) = stack.last().cloned() {
+            debug!("elem: {elem:?}, advance: {advance}");
+            // trace!("matrix:\n{}", self.matrix);
+
             let k = elem.k();
 
             let header = self.matrix.header(self.matrix.header_key);
             let header_cell = self.matrix.cell(header.cell);
 
-            if header_cell.right == header_cell.index {
+            if header_cell.right == header_cell.key {
                 let sol = self.create_sol(k, &sol_dict);
                 solutions.push(sol);
                 if self.return_first {
@@ -221,12 +237,7 @@ impl<T: Eq + Clone> IterativeAlgorithmXSolver<T> {
                 } if advance => {
                     stack.pop();
 
-                    self.matrix
-                        .iterate_cells(current_row, |c| c.left, false)
-                        .map(|v| v.header)
-                        .collect_vec()
-                        .into_iter()
-                        .for_each(|j| self.matrix.uncover(j));
+                    uncover_row(&mut self.matrix, current_row);
 
                     let next_row = self.matrix.cell(current_row).down;
                     if next_row == start_row {
@@ -240,7 +251,8 @@ impl<T: Eq + Clone> IterativeAlgorithmXSolver<T> {
                             current_row: next_row,
                             start_row,
                         });
-                        sol_dict.insert(k - 1, next_row);
+                        let col = self.matrix.cell(start_row).header;
+                        add_to_sol(&self.matrix, &mut sol_dict, k - 1, next_row, col);
                         advance = false;
                     }
                     next_row
@@ -251,8 +263,13 @@ impl<T: Eq + Clone> IterativeAlgorithmXSolver<T> {
                     } else {
                         self.matrix.random_column().unwrap()
                     };
+                    if start_col.size == 0 {
+                        advance = true;
+                        continue;
+                    }
+
                     let col_cell = start_col.cell;
-                    let col = start_col.index;
+                    let col = start_col.key;
 
                     self.matrix.cover(col);
 
@@ -263,20 +280,34 @@ impl<T: Eq + Clone> IterativeAlgorithmXSolver<T> {
                         start_row: col_cell,
                     });
                     advance = false;
-                    sol_dict.insert(k, next_row);
+                    add_to_sol(&self.matrix, &mut sol_dict, k, next_row, col);
 
                     next_row
                 }
             };
 
-            self.matrix
-                .iterate_cells(next_row, |cell| cell.right, false)
-                .map(|v| v.header)
-                .collect_vec()
-                .into_iter()
-                .for_each(|j| self.matrix.cover(j));
+            cover_row(&mut self.matrix, next_row);
         }
 
         solutions
     }
+}
+
+fn add_to_sol<T: Eq>(
+    matrix: &DancingLinksMatrix<T>,
+    sol_dict: &mut HashMap<usize, Key>,
+    k: usize,
+    next_row: Key,
+    current_col: HeaderKey,
+) {
+    let row = matrix.cell(next_row).row;
+    debug!("inserting cell {next_row:?} of row {row} at {k}, column = {current_col}");
+
+    if cfg!(debug_assertions) {
+        let h = matrix.cell(next_row).header;
+        let c = matrix.header(h).cell;
+        debug_assert!(c != next_row);
+    }
+
+    sol_dict.insert(k, next_row);
 }

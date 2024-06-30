@@ -1,11 +1,7 @@
 use itertools::Itertools;
 use test_case::test_matrix;
 
-use crate::{
-    cells::HeaderName,
-    matrix::{DancingLinksMatrix, RowIterator},
-    MatrixBuilder,
-};
+use crate::{cells::HeaderName, matrix::RowIterator, DancingLinksMatrix, MatrixBuilder};
 use HeaderName::{First as F, Other as O};
 
 #[test]
@@ -155,7 +151,7 @@ fn test_cell_iterator_left(include_start: bool) {
 
     let actual: Vec<_> = matrix
         .iterate_cells(key, |cell| cell.left, include_start)
-        .map(|h| h.index)
+        .map(|h| h.key)
         .collect();
 
     let mut exp = vec!["1", "3"];
@@ -180,7 +176,7 @@ fn test_cell_iterator_right(include_start: bool) {
 
     let actual: Vec<_> = matrix
         .iterate_cells(key, |cell| cell.right, include_start)
-        .map(|h| h.index)
+        .map(|h| h.key)
         .collect();
 
     let mut exp = vec!["3", "1"];
@@ -205,7 +201,7 @@ fn test_cell_iterator_up(include_start: bool) {
 
     let actual: Vec<_> = matrix
         .iterate_cells(key, |cell| cell.up, include_start)
-        .map(|h| h.index)
+        .map(|h| h.key)
         .collect();
 
     let mut exp = vec![1, 0, 4];
@@ -230,7 +226,7 @@ fn test_cell_iterator_down(include_start: bool) {
 
     let actual: Vec<_> = matrix
         .iterate_cells(key, |cell| cell.down, include_start)
-        .map(|h| h.index)
+        .map(|h| h.key)
         .collect();
 
     let mut exp = vec![3, 4, 0];
@@ -248,10 +244,6 @@ fn test_cell_iterator_down(include_start: bool) {
 }
 
 fn build_matrix() -> DancingLinksMatrix<String> {
-    fn r<const N: usize>(v: [&str; N]) -> Vec<String> {
-        v.iter().map(|v| v.to_string()).collect()
-    }
-
     MatrixBuilder::new()
         .add_column(1.to_string())
         .add_column(2.to_string())
@@ -262,4 +254,8 @@ fn build_matrix() -> DancingLinksMatrix<String> {
         .add_sorted_row(r(["2", "3"]))
         .add_sorted_row(r(["1", "2", "3"]))
         .build()
+}
+
+fn r<const N: usize>(v: [&str; N]) -> Vec<String> {
+    v.iter().map(|v| v.to_string()).collect()
 }

@@ -2,6 +2,7 @@ use std::env::args;
 
 use dancing_links_matrix::{
     ColumnSpec, DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder,
+    RecursiveAlgorithmXSolver, Solution,
 };
 use itertools::Itertools;
 use logging_timer::{time, Level};
@@ -58,33 +59,59 @@ fn solve(matrix: DancingLinksMatrix<String>, n: usize) {
             println!("No solution found");
         }
         Some(sol) => {
-            let mut pos = vec![0; n];
-
-            for v in sol.solution_map.values() {
-                let mut v = v.clone();
-                v.sort();
-                let c = v[2][1..].parse::<usize>().unwrap();
-                let r = v[3][1..].parse::<usize>().unwrap();
-                pos[r] = c;
-            }
-
-            for i in 0..n {
-                let mut r = vec![' '; n];
-                r[pos[i]] = 'O';
-                println!("|{}|", r.into_iter().join("|"));
-            }
+            print_sol(n, &sol);
         }
     }
 }
 
+#[time]
+fn solve_rec(matrix: DancingLinksMatrix<String>, n: usize) {
+    let mut solver = RecursiveAlgorithmXSolver::new(matrix, move |sol| print_sol(n, sol), true);
+    let found = solver.solve();
+
+    if !found {
+        println!("No solution found");
+    }
+}
+
+fn print_sol(n: usize, sol: &Solution<String>) -> bool {
+    let mut pos = vec![0; n];
+
+    for v in sol.solution_map.values() {
+        let v = v.iter().sorted().collect_vec();
+        let c = v[2][1..].parse::<usize>().unwrap();
+        let r = v[3][1..].parse::<usize>().unwrap();
+        pos[r] = c;
+    }
+
+    for i in 0..n {
+        let mut r = vec![' '; n];
+        r[pos[i]] = 'O';
+        println!("|{}|", r.into_iter().join("|"));
+    }
+
+    true
+}
+
 fn main() {
-    simple_logger::init_with_level(Level::Debug).unwrap();
+    let level = if cfg!(debug_assertions) {
+        Level::Debug
+    } else {
+        Level::Info
+    };
+    simple_logger::init_with_level(level).unwrap();
 
     let n = args()
         .nth(1)
         .map(|v| v.parse::<usize>().expect("Invalid size"))
         .unwrap_or(8);
 
+    let iterative = args().nth(2).map(|v| v == "1").unwrap_or(false);
     let matrix = build_matrix(n);
-    solve(matrix, n);
+
+    if iterative {
+        solve(matrix, n);
+    } else {
+        solve_rec(matrix, n);
+    }
 }

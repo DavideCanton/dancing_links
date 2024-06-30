@@ -202,7 +202,7 @@ impl<T: Eq> MatrixRowBuilder<T> {
                 for header in headers_iter.by_ref() {
                     if let HeaderName::Other(name) = &header.name {
                         if *name == val {
-                            to_add.push(header.index);
+                            to_add.push(header.key);
                             added = true;
                             break;
                         }

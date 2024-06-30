@@ -23,6 +23,14 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug executable 'nqueens' on linux",
+            "program": "${workspaceRoot}/target/debug/nqueens",
+            "args": ["4", "0"],
+            "cwd": "${workspaceRoot}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests in executable 'sudoku'",
             "cargo": {
                 "args": ["test", "--no-run", "--bin=sudoku"],

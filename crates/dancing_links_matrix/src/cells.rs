@@ -23,6 +23,16 @@ impl From<usize> for CellRow {
     }
 }
 
+impl From<CellRow> for usize {
+    /// Converts a `CellRow` into a `usize`.
+    fn from(row: CellRow) -> Self {
+        match row {
+            CellRow::Header => panic!("Cannot convert Header to usize"),
+            CellRow::Data(name) => name,
+        }
+    }
+}
+
 impl Display for CellRow {
     /// Formats the `CellRow` as a string.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -36,17 +46,17 @@ impl Display for CellRow {
 /// The cell of the matrix.
 #[derive(Debug)]
 pub(crate) struct Cell {
-    /// The index of the cell.
-    pub(crate) index: Key,
-    /// The index of the cell above the current cell.
+    /// The key of the cell.
+    pub(crate) key: Key,
+    /// The key of the cell above the current cell.
     pub(crate) up: Key,
-    /// The index of the cell below the current cell.
+    /// The key of the cell below the current cell.
     pub(crate) down: Key,
-    /// The index of the cell to the left of the current cell.
+    /// The key of the cell to the left of the current cell.
     pub(crate) left: Key,
-    /// The index of the cell to the right of the current cell.
+    /// The key of the cell to the right of the current cell.
     pub(crate) right: Key,
-    /// The index of the header cell.
+    /// The key of the header cell.
     pub(crate) header: HeaderKey,
     /// The row of the cell.
     pub(crate) row: CellRow,
@@ -57,16 +67,16 @@ impl Cell {
     ///
     /// # Arguments
     ///
-    /// * `index` - The index of the cell.
-    /// * `header` - The index of the header cell.
+    /// * `key` - The key of the cell.
+    /// * `header` - The key of the header cell.
     /// * `row` - The row of the cell.
-    pub fn new(index: Key, header: HeaderKey, row: CellRow) -> Cell {
+    pub fn new(key: Key, header: HeaderKey, row: CellRow) -> Cell {
         Cell {
-            index,
-            up: index,
-            down: index,
-            left: index,
-            right: index,
+            key,
+            up: key,
+            down: key,
+            left: key,
+            right: key,
             header,
             row,
         }
@@ -97,8 +107,8 @@ impl<T: Display> Display for HeaderName<T> {
 /// Contains the key of a physical cell linked to the header cell.
 #[derive(Debug)]
 pub(crate) struct HeaderCell<T> {
-    /// The index of the header cell.
-    pub(crate) index: HeaderKey,
+    /// The key of the header cell.
+    pub(crate) key: HeaderKey,
     /// The name of the header cell.
     pub(crate) name: HeaderName<T>,
     /// The size of the header cell.
@@ -113,11 +123,11 @@ impl<T> HeaderCell<T> {
     /// # Arguments
     ///
     /// * `name` - The name of the header cell.
-    /// * `index` - The index of the header cell.
+    /// * `key` - The key of the header cell.
     /// * `cell_key` - The key of the linked cell.
-    pub fn new(name: HeaderName<T>, index: HeaderKey, cell_key: Key) -> HeaderCell<T> {
+    pub fn new(name: HeaderName<T>, key: HeaderKey, cell_key: Key) -> HeaderCell<T> {
         HeaderCell {
-            index,
+            key,
             name,
             size: 0,
             cell: cell_key,
