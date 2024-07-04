@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::marker::PhantomData;
+use std::mem;
 use std::{collections::HashSet, fmt};
 
 use itertools::Itertools;
@@ -40,9 +41,10 @@ pub struct DancingLinksMatrix<T> {
     pub(crate) header_key: HeaderKey,
     pub(crate) rows: usize,
     pub(crate) columns: usize,
-    pub(crate) headers: VecAllocator<HeaderCell<T>>,
-    pub(crate) cells: VecAllocator<Cell>,
+    pub(crate) headers: VecAllocator<HeaderCell<T>, HeaderKey>,
+    pub(crate) cells: VecAllocator<Cell, Key>,
     pub(crate) average_row_size: usize,
+    pub(crate) _buffer: Box<[Option<Key>]>,
 }
 
 impl<T: Eq> DancingLinksMatrix<T> {
@@ -85,49 +87,69 @@ impl<T: Eq> DancingLinksMatrix<T> {
         let header_l = self.cell_mut(header_l_index);
         header_l.right = header_r_index;
 
-        let mut v = Vec::with_capacity(self.rows * self.average_row_size);
+        let mut v = mem::replace(&mut self._buffer, Box::new([]));
+        let mut ind = 0;
 
         for i in self.iterate_cells(header_cell_index, |c| c.down, false) {
             for j in self.iterate_cells(i.key, |c| c.right, false) {
-                v.push(j.key)
+                v[ind] = Some(j.key);
+                ind += 1;
+            }
+        }
+        if ind < v.len() {
+            v[ind] = None;
+        }
+
+        for j in v.iter() {
+            if let Some(j) = j {
+                let cell = self.cell(*j);
+
+                let cell_d_index = cell.down;
+                let cell_u_index = cell.up;
+                let cell_header = cell.header;
+
+                self.cell_mut(cell_d_index).up = cell_u_index;
+                self.cell_mut(cell_u_index).down = cell_d_index;
+                self.header_mut(cell_header).size -= 1;
+            } else {
+                break;
             }
         }
 
-        for j in v {
-            let cell = self.cell(j);
-
-            let cell_d_index = cell.down;
-            let cell_u_index = cell.up;
-            let cell_header = cell.header;
-
-            self.cell_mut(cell_d_index).up = cell_u_index;
-            self.cell_mut(cell_u_index).down = cell_d_index;
-            self.header_mut(cell_header).size -= 1;
-        }
+        mem::swap(&mut self._buffer, &mut v)
     }
 
     pub fn uncover(&mut self, key: HeaderKey) {
         let header_cell_index = self.header(key).cell;
 
-        let mut v = Vec::with_capacity(self.rows * self.average_row_size);
+        let mut v = mem::replace(&mut self._buffer, Box::new([]));
+        let mut ind = 0;
 
         for i in self.iterate_cells(header_cell_index, |c| c.up, false) {
             for j in self.iterate_cells(i.key, |c| c.left, false) {
-                v.push(j.key)
+                v[ind] = Some(j.key);
+                ind += 1;
             }
         }
+        if ind < v.len() {
+            v[ind] = None;
+        }
 
-        for j in v {
-            let cell = self.cell(j);
+        for j in v.iter() {
+            if let Some(j) = j {
+                let cell = self.cell(*j);
 
-            let cell_d_index = cell.down;
-            let cell_u_index = cell.up;
-            let cell_index = cell.key;
-            let cell_header = cell.header;
+                let cell_d_index = cell.down;
+                let cell_u_index = cell.up;
+                let cell_index = cell.key;
+                let cell_header = cell.header;
 
-            self.cell_mut(cell_d_index).up = cell_index;
-            self.cell_mut(cell_u_index).down = cell_index;
-            self.header_mut(cell_header).size += 1;
+                self.cell_mut(cell_d_index).up = cell_index;
+                self.cell_mut(cell_u_index).down = cell_index;
+                self.header_mut(cell_header).size += 1;
+            } else {
+                break;
+            }
         }
 
         let header_cell = self.cell(header_cell_index);
@@ -140,6 +162,8 @@ impl<T: Eq> DancingLinksMatrix<T> {
 
         let cell_l = self.cell_mut(cell_l_index);
         cell_l.right = header_cell_index;
+
+        mem::swap(&mut self._buffer, &mut v)
     }
 
     pub(crate) fn iterate_cells<F: Fn(&Cell) -> Key>(
@@ -147,7 +171,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
         start: Key,
         getter: F,
         include_start: bool,
-    ) -> CellIterator<F, T> {
+    ) -> impl Iterator<Item = &Cell> {
         CellIterator::new(self, start, getter, include_start)
     }
 
@@ -156,24 +180,24 @@ impl<T: Eq> DancingLinksMatrix<T> {
         start: HeaderKey,
         getter: F,
         include_start: bool,
-    ) -> HeaderCellIterator<F, T> {
+    ) -> impl Iterator<Item = &HeaderCell<T>> {
         HeaderCellIterator::new(self, start, getter, include_start)
     }
 
     pub(crate) fn add_cell(&mut self, header_cell_key: HeaderKey, row: CellRow) -> Key {
-        let cell_key = self.cells.next_key().into();
+        let cell_key = self.cells.next_key();
         let cell = Cell::new(cell_key, header_cell_key, row);
-        let actual_key = self.cells.insert(cell).into();
+        let actual_key = self.cells.insert(cell);
         assert_eq!(actual_key, cell_key);
         actual_key
     }
 
     pub(crate) fn add_header(&mut self, name: HeaderName<T>) -> (HeaderKey, Key) {
-        let header_key = self.headers.next_key().into();
+        let header_key = self.headers.next_key();
         let header_cell_key = self.add_cell(header_key, CellRow::Header);
 
         let header = HeaderCell::new(name, header_key, header_cell_key);
-        let actual_header_key = self.headers.insert(header).into();
+        let actual_header_key = self.headers.insert(header);
         assert_eq!(header_key, actual_header_key);
 
         (actual_header_key, header_cell_key)
@@ -211,19 +235,19 @@ impl<T: Eq> DancingLinksMatrix<T> {
     }
 
     pub(crate) fn cell(&self, key: Key) -> &Cell {
-        &self.cells[key.into()]
+        &self.cells[key]
     }
 
     pub(crate) fn cell_mut(&mut self, key: Key) -> &mut Cell {
-        &mut self.cells[key.into()]
+        &mut self.cells[key]
     }
 
     pub(crate) fn header_mut(&mut self, key: HeaderKey) -> &mut HeaderCell<T> {
-        &mut self.headers[key.into()]
+        &mut self.headers[key]
     }
 
     pub(crate) fn header(&self, key: HeaderKey) -> &HeaderCell<T> {
-        &self.headers[key.into()]
+        &self.headers[key]
     }
 
     pub(crate) fn link_right(&mut self, left: Key, right: Key) {

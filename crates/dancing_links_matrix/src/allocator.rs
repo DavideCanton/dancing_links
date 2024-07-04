@@ -6,7 +6,10 @@
 //! The `VecAllocator` type implements this trait and uses a `Vec<T>` as the
 //! underlying storage.
 
-use std::ops::{Index, IndexMut};
+use std::{
+    marker::PhantomData,
+    ops::{Index, IndexMut},
+};
 
 /// A trait for allocating values of type `T` and returning a key of type `K`.
 pub trait Allocator<T, K> {
@@ -26,38 +29,45 @@ pub trait Allocator<T, K> {
     fn iter<'s>(&'s self) -> impl Iterator<Item = &'s T> + 's
     where
         T: 's;
+
+    fn finalize(&mut self) {}
 }
 
 /// A vector backed allocator for values of type `T`.
 ///
 /// This type implements the `Allocator` trait and uses a `Vec<T>` as the
 /// underlying storage.
-pub struct VecAllocator<T> {
+pub struct VecAllocator<T, K> {
     buffer: Vec<T>,
+    _key: PhantomData<K>,
 }
 
-impl<T> VecAllocator<T> {
+impl<T, K> VecAllocator<T, K> {
     /// Creates a new `VecAllocator`.
-    pub(crate) fn new() -> VecAllocator<T> {
-        VecAllocator { buffer: Vec::new() }
+    pub(crate) fn new() -> VecAllocator<T, K> {
+        VecAllocator {
+            buffer: Vec::new(),
+            _key: PhantomData,
+        }
     }
 
     /// Creates a new `VecAllocator` with the specified capacity.
-    pub(crate) fn with_capacity(len: usize) -> VecAllocator<T> {
+    pub(crate) fn with_capacity(len: usize) -> VecAllocator<T, K> {
         VecAllocator {
             buffer: Vec::with_capacity(len),
+            _key: PhantomData,
         }
     }
 }
 
-impl<T> Allocator<T, usize> for VecAllocator<T> {
-    fn next_key(&self) -> usize {
-        self.buffer.len()
+impl<T, K: Into<usize> + From<usize>> Allocator<T, K> for VecAllocator<T, K> {
+    fn next_key(&self) -> K {
+        self.buffer.len().into()
     }
 
-    fn insert(&mut self, val: T) -> usize {
+    fn insert(&mut self, val: T) -> K {
         self.buffer.push(val);
-        self.buffer.len() - 1
+        (self.buffer.len() - 1).into()
     }
 
     fn len(&self) -> usize {
@@ -70,18 +80,22 @@ impl<T> Allocator<T, usize> for VecAllocator<T> {
     {
         self.buffer.iter()
     }
-}
 
-impl<T> Index<usize> for VecAllocator<T> {
-    type Output = T;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.buffer[index]
+    fn finalize(&mut self) {
+        self.buffer.shrink_to_fit()
     }
 }
 
-impl<T> IndexMut<usize> for VecAllocator<T> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.buffer[index]
+impl<T, K: Into<usize>> Index<K> for VecAllocator<T, K> {
+    type Output = T;
+
+    fn index(&self, index: K) -> &Self::Output {
+        unsafe { self.buffer.get_unchecked(index.into()) }
+    }
+}
+
+impl<T, K: Into<usize>> IndexMut<K> for VecAllocator<T, K> {
+    fn index_mut(&mut self, index: K) -> &mut Self::Output {
+        unsafe { self.buffer.get_unchecked_mut(index.into()) }
     }
 }

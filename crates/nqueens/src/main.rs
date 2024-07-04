@@ -37,7 +37,7 @@ fn compute_row(i: usize, j: usize, n: usize) -> Vec<usize> {
         .collect()
 }
 
-#[time]
+#[time("info")]
 fn build_matrix(n: usize) -> DancingLinksMatrix<String> {
     let mut matrix_builder = MatrixBuilder::from_iterable(names(n));
 
@@ -49,7 +49,7 @@ fn build_matrix(n: usize) -> DancingLinksMatrix<String> {
     matrix_builder.build()
 }
 
-#[time]
+#[time("info")]
 fn solve(matrix: DancingLinksMatrix<String>, n: usize) {
     let mut solver = IterativeAlgorithmXSolver::new(matrix, true, true);
     let solutions = solver.solve();
@@ -64,7 +64,7 @@ fn solve(matrix: DancingLinksMatrix<String>, n: usize) {
     }
 }
 
-#[time]
+#[time("info")]
 fn solve_rec(matrix: DancingLinksMatrix<String>, n: usize) {
     let mut solver = RecursiveAlgorithmXSolver::new(matrix, move |sol| print_sol(n, sol), true);
     let found = solver.solve();

@@ -100,14 +100,16 @@ impl<T: Eq> MatrixColBuilder<T> {
         }
         let column_names = self.columns;
 
-        let headers = VecAllocator::with_capacity(column_names.len());
+        let headers = VecAllocator::with_capacity(column_names.len() + 1);
+
         let mut matrix = DancingLinksMatrix {
-            header_key: headers.next_key().into(),
+            header_key: headers.next_key(),
             rows: 0,
             columns: column_names.len(),
             headers,
             cells: VecAllocator::new(),
             average_row_size: 0,
+            _buffer: Box::new([]),
         };
 
         let (header_key, header_cell_key) = matrix.add_header(HeaderName::First);
@@ -265,6 +267,8 @@ impl<T: Eq> MatrixRowBuilder<T> {
         } else {
             matrix.cells.len() / matrix.rows
         };
+        matrix._buffer = vec![None; matrix.cells.len()].into_boxed_slice();
+        matrix.cells.finalize();
 
         matrix
     }

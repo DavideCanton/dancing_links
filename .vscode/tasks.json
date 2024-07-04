@@ -10,6 +10,14 @@
                 "kind": "build"
             },
             "label": "rust: cargo build"
+        },
+        {
+            "type": "cargo",
+            "command": "build",
+            "args": ["--profile", "profiling"],
+            "problemMatcher": ["$rustc"],
+            "group": "build",
+            "label": "rust: cargo build profiling"
         }
     ]
 }
