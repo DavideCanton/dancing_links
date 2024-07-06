@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 dancing_links_matrix = { path = "../dancing_links_matrix" }
+cmd_common = { path = "../cmd_common" }
 itertools.workspace = true
 logging_timer.workspace = true
-simple_logger.workspace = true
+clap.workspace = true

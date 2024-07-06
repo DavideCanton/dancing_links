@@ -1,11 +1,11 @@
-use std::env::args;
-
+use clap::Parser;
+use cmd_common::{init_log, CommonArgs};
 use dancing_links_matrix::{
     ColumnSpec, DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder,
     RecursiveAlgorithmXSolver, Solution,
 };
 use itertools::Itertools;
-use logging_timer::{time, Level};
+use logging_timer::time;
 
 fn names(n: usize) -> Vec<ColumnSpec<String>> {
     let mut names = Vec::new();
@@ -93,25 +93,25 @@ fn print_sol(n: usize, sol: &Solution<String>) -> bool {
     true
 }
 
+#[derive(Debug, Parser)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(help = "Number of queens", default_value_t = 8)]
+    n: usize,
+    #[command(flatten)]
+    common_args: CommonArgs,
+}
+
 fn main() {
-    let level = if cfg!(debug_assertions) {
-        Level::Debug
-    } else {
-        Level::Info
-    };
-    simple_logger::init_with_level(level).unwrap();
+    let args = Args::parse();
+    init_log(&args.common_args);
 
-    let n = args()
-        .nth(1)
-        .map(|v| v.parse::<usize>().expect("Invalid size"))
-        .unwrap_or(8);
-
-    let iterative = args().nth(2).map(|v| v == "1").unwrap_or(false);
+    let n = args.n;
     let matrix = build_matrix(n);
 
-    if iterative {
-        solve(matrix, n);
-    } else {
+    if args.common_args.recursive {
         solve_rec(matrix, n);
+    } else {
+        solve(matrix, n);
     }
 }

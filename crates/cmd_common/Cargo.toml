@@ -1,0 +1,9 @@
+[package]
+name = "cmd_common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log.workspace = true
+clap.workspace = true
+simple_logger.workspace = true

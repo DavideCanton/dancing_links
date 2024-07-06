@@ -1,17 +1,19 @@
 use std::{
     collections::HashMap,
-    env::args,
     fs::File,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
     str::FromStr,
 };
 
+use clap::Parser;
+use cmd_common::{init_log, CommonArgs};
 use dancing_links_matrix::{
-    DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder, Solution,
+    DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder, RecursiveAlgorithmXSolver,
+    Solution,
 };
 use itertools::Itertools;
-use logging_timer::{time, Level};
+use logging_timer::time;
 
 fn prod() -> impl Iterator<Item = (usize, usize)> {
     let range = 1..=9;
@@ -57,7 +59,7 @@ fn compute_row(mut i: usize, mut j: usize, mut v: usize) -> Vec<usize> {
 
 const M: usize = 20;
 
-fn print_sol(sol: Solution<String>) {
+fn print_sol(sol: &Solution<String>) {
     let mut matrix = vec![0; 81];
 
     for v in sol.solution_map.values() {
@@ -105,7 +107,22 @@ fn print_sol(sol: Solution<String>) {
 }
 
 #[time]
-fn solve(matrix: DancingLinksMatrix<String>) {
+fn solve_rec(matrix: DancingLinksMatrix<String>) {
+    let mut solver = RecursiveAlgorithmXSolver::new(
+        matrix,
+        |sol| {
+            print_sol(sol);
+            true
+        },
+        true,
+    );
+    if !solver.solve() {
+        println!("No solution found");
+    }
+}
+
+#[time]
+fn solve_it(matrix: DancingLinksMatrix<String>) {
     let mut solver = IterativeAlgorithmXSolver::new(matrix, true, true);
     let solutions = solver.solve();
 
@@ -114,7 +131,7 @@ fn solve(matrix: DancingLinksMatrix<String>) {
             println!("No solution found");
         }
         Some(sol) => {
-            print_sol(sol);
+            print_sol(&sol);
         }
     }
 }
@@ -170,26 +187,31 @@ fn load_board(path: &Path) -> HashMap<(usize, usize), usize> {
     map
 }
 
-fn main() {
-    let level = if cfg!(debug_assertions) {
-        Level::Debug
-    } else {
-        Level::Info
-    };
-    simple_logger::init_with_level(level).unwrap();
+#[derive(Debug, Parser)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(help = "File to solve")]
+    file: String,
+    #[command(flatten)]
+    common_args: CommonArgs,
+}
 
-    let path = args()
-        .nth(1)
-        .map(|v| PathBuf::from_str(&v).expect("Invalid path"))
-        .expect("Path not specified");
+fn main() {
+    let args = Args::parse();
+    init_log(&args.common_args);
+
+    let path = PathBuf::from_str(&args.file).expect("Invalid path");
 
     if !path.is_file() {
         panic!("Not a file");
     }
 
     let known = load_board(&path);
-
     let matrix = build_matrix(known);
 
-    solve(matrix);
+    if args.common_args.recursive {
+        solve_rec(matrix);
+    } else {
+        solve_it(matrix);
+    }
 }
