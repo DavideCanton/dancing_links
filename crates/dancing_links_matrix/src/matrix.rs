@@ -3,7 +3,6 @@ use std::{
     fmt,
     hash::Hash,
     marker::PhantomData,
-    mem,
 };
 
 use itertools::Itertools;
@@ -48,7 +47,6 @@ pub struct DancingLinksMatrix<T> {
     pub(crate) columns: usize,
     pub(crate) headers: VecAllocator<HeaderCell<T>, HeaderKey>,
     pub(crate) cells: VecAllocator<Cell, Key>,
-    pub(crate) _buffer: Box<[Option<Key>]>,
 }
 
 impl<T: Eq> DancingLinksMatrix<T> {
@@ -88,69 +86,44 @@ impl<T: Eq> DancingLinksMatrix<T> {
         let header_l = self.cell_mut(header_l_index);
         header_l.right = header_r_index;
 
-        let mut v = mem::replace(&mut self._buffer, Box::new([]));
-        let mut ind = 0;
-
-        for i in self.iterate_cells(header_cell_index, |c| c.down, false) {
-            for j in self.iterate_cells(i.key, |c| c.right, false) {
-                v[ind] = Some(j.key);
-                ind += 1;
-            }
-        }
-        if ind < v.len() {
-            v[ind] = None;
-        }
+        let v = self
+            .iterate_cells(header_cell_index, |c| c.down, false)
+            .flat_map(|i| self.iterate_cells(i.key, |c| c.right, false))
+            .map(|j| j.key)
+            .collect_vec();
 
         for j in v.iter() {
-            if let Some(j) = j {
-                let cell = self.cell(*j);
+            let cell = self.cell(*j);
 
-                let cell_d_index = cell.down;
-                let cell_u_index = cell.up;
-                let cell_header = cell.header;
+            let cell_d_index = cell.down;
+            let cell_u_index = cell.up;
+            let cell_header = cell.header;
 
-                self.cell_mut(cell_d_index).up = cell_u_index;
-                self.cell_mut(cell_u_index).down = cell_d_index;
-                self.header_mut(cell_header).size -= 1;
-            } else {
-                break;
-            }
+            self.cell_mut(cell_d_index).up = cell_u_index;
+            self.cell_mut(cell_u_index).down = cell_d_index;
+            self.header_mut(cell_header).size -= 1;
         }
-
-        mem::swap(&mut self._buffer, &mut v)
     }
 
     pub(crate) fn uncover(&mut self, key: HeaderKey) {
         let header_cell_index = self.header(key).cell;
 
-        let mut v = mem::replace(&mut self._buffer, Box::new([]));
-        let mut ind = 0;
-
-        for i in self.iterate_cells(header_cell_index, |c| c.up, false) {
-            for j in self.iterate_cells(i.key, |c| c.left, false) {
-                v[ind] = Some(j.key);
-                ind += 1;
-            }
-        }
-        if ind < v.len() {
-            v[ind] = None;
-        }
-
+        let v = self
+            .iterate_cells(header_cell_index, |c| c.up, false)
+            .flat_map(|j| self.iterate_cells(j.key, |c| c.left, false))
+            .map(|j| j.key)
+            .collect_vec();
         for j in v.iter() {
-            if let Some(j) = j {
-                let cell = self.cell(*j);
+            let cell = self.cell(*j);
 
-                let cell_d_index = cell.down;
-                let cell_u_index = cell.up;
-                let cell_index = cell.key;
-                let cell_header = cell.header;
+            let cell_d_index = cell.down;
+            let cell_u_index = cell.up;
+            let cell_index = cell.key;
+            let cell_header = cell.header;
 
-                self.cell_mut(cell_d_index).up = cell_index;
-                self.cell_mut(cell_u_index).down = cell_index;
-                self.header_mut(cell_header).size += 1;
-            } else {
-                break;
-            }
+            self.cell_mut(cell_d_index).up = cell_index;
+            self.cell_mut(cell_u_index).down = cell_index;
+            self.header_mut(cell_header).size += 1;
         }
 
         let header_cell = self.cell(header_cell_index);
@@ -163,8 +136,6 @@ impl<T: Eq> DancingLinksMatrix<T> {
 
         let cell_l = self.cell_mut(cell_l_index);
         cell_l.right = header_cell_index;
-
-        mem::swap(&mut self._buffer, &mut v)
     }
 
     pub(crate) fn iterate_cells<F: Fn(&Cell) -> Key>(

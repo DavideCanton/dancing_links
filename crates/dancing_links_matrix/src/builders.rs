@@ -263,7 +263,6 @@ impl<T: Eq> MatrixRowBuilder<T> {
     pub fn build(self) -> DancingLinksMatrix<T> {
         let mut matrix = self.matrix;
 
-        let buffer = vec![None; matrix.cells.len()].into_boxed_slice();
         matrix.cells.finalize();
 
         DancingLinksMatrix {
@@ -272,7 +271,6 @@ impl<T: Eq> MatrixRowBuilder<T> {
             rows: matrix.rows,
             columns: matrix.columns,
             header_key: matrix.header_key,
-            _buffer: buffer,
         }
     }
 }
