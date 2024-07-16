@@ -1,14 +1,19 @@
-use std::collections::HashMap;
-use std::hash::Hash;
-use std::marker::PhantomData;
-use std::mem;
-use std::{collections::HashSet, fmt};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    hash::Hash,
+    marker::PhantomData,
+    mem,
+};
 
 use itertools::Itertools;
+use rand::{thread_rng, Rng};
 
-use crate::allocator::{Allocator, VecAllocator};
-use crate::cells::{Cell, CellRow, HeaderCell, HeaderName};
-use crate::keys::{HeaderKey, Key};
+use crate::{
+    allocator::{Allocator, VecAllocator},
+    cells::{Cell, CellRow, HeaderCell, HeaderName},
+    keys::{HeaderKey, Key},
+};
 
 pub struct ColumnSpec<T> {
     pub(crate) name: T,
@@ -60,10 +65,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
             .min_by_key(|h| h.size)
     }
 
-    #[cfg(feature = "random")]
     pub(crate) fn random_column(&self) -> Option<&HeaderCell<T>> {
-        use rand::{thread_rng, Rng};
-
         if self.columns == 0 {
             return None;
         }

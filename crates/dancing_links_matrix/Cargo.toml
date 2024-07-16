@@ -4,13 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rand = { version = "0.8.5", optional = true }
+rand = "0.8.5"
 itertools.workspace = true
 log.workspace = true
 
 [dev-dependencies]
 test-case = "3.3.1"
-
-[features]
-default = ["random"]
-random = ["dep:rand"]
