@@ -10,8 +10,8 @@ use itertools::Itertools;
 
 use crate::{
     allocator::{Allocator, VecAllocator},
-    cells::{CellRow, HeaderName},
-    keys::HeaderKey,
+    cells::{Cell, CellRow, HeaderCell, HeaderName},
+    keys::{HeaderKey, Key},
     matrix::{ColumnSpec, DancingLinksMatrix},
 };
 
@@ -102,14 +102,12 @@ impl<T: Eq> MatrixColBuilder<T> {
 
         let headers = VecAllocator::with_capacity(column_names.len() + 1);
 
-        let mut matrix = DancingLinksMatrix {
+        let mut matrix = BuildingMatrix {
             header_key: headers.next_key(),
-            rows: 0,
-            columns: column_names.len(),
             headers,
             cells: VecAllocator::new(),
-            average_row_size: 0,
-            _buffer: Box::new([]),
+            rows: 0,
+            columns: column_names.len(),
         };
 
         let (header_key, header_cell_key) = matrix.add_header(HeaderName::First);
@@ -129,12 +127,14 @@ impl<T: Eq> MatrixColBuilder<T> {
 
         matrix.link_right(prev_cell_key, header_cell_key);
 
+        matrix.headers.finalize();
+
         MatrixRowBuilder { matrix }
     }
 }
 
 pub struct MatrixRowBuilder<T> {
-    matrix: DancingLinksMatrix<T>,
+    matrix: BuildingMatrix<T>,
 }
 
 impl<T: Eq, I: Into<ColumnSpec<T>>> FromIterator<I> for MatrixRowBuilder<T> {
@@ -262,14 +262,64 @@ impl<T: Eq> MatrixRowBuilder<T> {
 
     pub fn build(self) -> DancingLinksMatrix<T> {
         let mut matrix = self.matrix;
-        matrix.average_row_size = if matrix.rows == 0 {
-            0
-        } else {
-            matrix.cells.len() / matrix.rows
-        };
-        matrix._buffer = vec![None; matrix.cells.len()].into_boxed_slice();
+
+        let buffer = vec![None; matrix.cells.len()].into_boxed_slice();
         matrix.cells.finalize();
 
-        matrix
+        DancingLinksMatrix {
+            headers: matrix.headers,
+            cells: matrix.cells,
+            rows: matrix.rows,
+            columns: matrix.columns,
+            header_key: matrix.header_key,
+            _buffer: buffer,
+        }
+    }
+}
+
+struct BuildingMatrix<T> {
+    pub(crate) header_key: HeaderKey,
+    pub(crate) headers: VecAllocator<HeaderCell<T>, HeaderKey>,
+    pub(crate) cells: VecAllocator<Cell, Key>,
+    pub(crate) rows: usize,
+    pub(crate) columns: usize,
+}
+
+impl<T> BuildingMatrix<T> {
+    fn add_cell(&mut self, header_cell_key: HeaderKey, row: CellRow) -> Key {
+        let cell_key = self.cells.next_key();
+        let cell = Cell::new(cell_key, header_cell_key, row);
+        let actual_key = self.cells.insert(cell);
+        assert_eq!(actual_key, cell_key);
+        actual_key
+    }
+
+    fn add_header(&mut self, name: HeaderName<T>) -> (HeaderKey, Key) {
+        let header_key = self.headers.next_key();
+        let header_cell_key = self.add_cell(header_key, CellRow::Header);
+
+        let header = HeaderCell::new(name, header_key, header_cell_key);
+        let actual_header_key = self.headers.insert(header);
+        assert_eq!(header_key, actual_header_key);
+
+        (actual_header_key, header_cell_key)
+    }
+
+    fn link_right(&mut self, left: Key, right: Key) {
+        self.cell_mut(left).right = right;
+        self.cell_mut(right).left = left;
+    }
+
+    fn link_down(&mut self, up: Key, down: Key) {
+        self.cell_mut(up).down = down;
+        self.cell_mut(down).up = up;
+    }
+
+    fn cell_mut(&mut self, key: Key) -> &mut Cell {
+        &mut self.cells[key]
+    }
+
+    fn header_mut(&mut self, key: HeaderKey) -> &mut HeaderCell<T> {
+        &mut self.headers[key]
     }
 }

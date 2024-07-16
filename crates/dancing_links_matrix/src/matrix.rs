@@ -48,7 +48,6 @@ pub struct DancingLinksMatrix<T> {
     pub(crate) columns: usize,
     pub(crate) headers: VecAllocator<HeaderCell<T>, HeaderKey>,
     pub(crate) cells: VecAllocator<Cell, Key>,
-    pub(crate) average_row_size: usize,
     pub(crate) _buffer: Box<[Option<Key>]>,
 }
 
@@ -76,7 +75,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
             .nth(num)
     }
 
-    pub fn cover(&mut self, key: HeaderKey) {
+    pub(crate) fn cover(&mut self, key: HeaderKey) {
         let header_cell_index = self.header(key).cell;
         let header_cell = self.cell(header_cell_index);
 
@@ -121,7 +120,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
         mem::swap(&mut self._buffer, &mut v)
     }
 
-    pub fn uncover(&mut self, key: HeaderKey) {
+    pub(crate) fn uncover(&mut self, key: HeaderKey) {
         let header_cell_index = self.header(key).cell;
 
         let mut v = mem::replace(&mut self._buffer, Box::new([]));
@@ -186,25 +185,6 @@ impl<T: Eq> DancingLinksMatrix<T> {
         HeaderCellIterator::new(self, start, getter, include_start)
     }
 
-    pub(crate) fn add_cell(&mut self, header_cell_key: HeaderKey, row: CellRow) -> Key {
-        let cell_key = self.cells.next_key();
-        let cell = Cell::new(cell_key, header_cell_key, row);
-        let actual_key = self.cells.insert(cell);
-        assert_eq!(actual_key, cell_key);
-        actual_key
-    }
-
-    pub(crate) fn add_header(&mut self, name: HeaderName<T>) -> (HeaderKey, Key) {
-        let header_key = self.headers.next_key();
-        let header_cell_key = self.add_cell(header_key, CellRow::Header);
-
-        let header = HeaderCell::new(name, header_key, header_cell_key);
-        let actual_header_key = self.headers.insert(header);
-        assert_eq!(header_key, actual_header_key);
-
-        (actual_header_key, header_cell_key)
-    }
-
     #[allow(dead_code)]
     pub(crate) fn locate_cell<R: Into<CellRow>, C: Eq + ?Sized>(
         &self,
@@ -250,16 +230,6 @@ impl<T: Eq> DancingLinksMatrix<T> {
 
     pub(crate) fn header(&self, key: HeaderKey) -> &HeaderCell<T> {
         &self.headers[key]
-    }
-
-    pub(crate) fn link_right(&mut self, left: Key, right: Key) {
-        self.cell_mut(left).right = right;
-        self.cell_mut(right).left = left;
-    }
-
-    pub(crate) fn link_down(&mut self, up: Key, down: Key) {
-        self.cell_mut(up).down = down;
-        self.cell_mut(down).up = up;
     }
 }
 
