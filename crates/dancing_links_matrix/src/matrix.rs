@@ -50,9 +50,10 @@ pub struct DancingLinksMatrix<T> {
 }
 
 impl<T: Eq> DancingLinksMatrix<T> {
-    pub fn iter_rows<U: ?Sized>(&self) -> RowIterator<T, U>
+    pub fn iter_rows<Ret>(&self) -> RowIterator<T, Ret>
     where
-        T: AsRef<U>,
+        T: AsRef<Ret>,
+        Ret: ?Sized,
     {
         RowIterator::new(self)
     }
@@ -278,14 +279,17 @@ impl<T: fmt::Display + Eq> fmt::Display for DancingLinksMatrix<T> {
     }
 }
 
-pub struct RowIterator<'a, T, U: ?Sized> {
+pub struct RowIterator<'a, T, Ret: ?Sized> {
     matrix: &'a DancingLinksMatrix<T>,
     last: usize,
-    _p: PhantomData<Box<U>>,
+    _p: PhantomData<Box<Ret>>,
 }
 
-impl<'a, T, U: ?Sized> RowIterator<'a, T, U> {
-    fn new(matrix: &'a DancingLinksMatrix<T>) -> RowIterator<'a, T, U> {
+impl<'a, T, Ret> RowIterator<'a, T, Ret>
+where
+    Ret: ?Sized,
+{
+    fn new(matrix: &'a DancingLinksMatrix<T>) -> RowIterator<'a, T, Ret> {
         RowIterator {
             matrix,
             last: 0,
@@ -294,11 +298,12 @@ impl<'a, T, U: ?Sized> RowIterator<'a, T, U> {
     }
 }
 
-impl<'a, T: Eq, U: 'a + Eq + Hash + ?Sized> Iterator for RowIterator<'a, T, U>
+impl<'a, T, Ret> Iterator for RowIterator<'a, T, Ret>
 where
-    T: AsRef<U>,
+    T: AsRef<Ret> + Eq,
+    Ret: 'a + Eq + Hash + ?Sized,
 {
-    type Item = HashSet<&'a U>;
+    type Item = HashSet<&'a Ret>;
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         let r = self.matrix.rows;
@@ -348,7 +353,11 @@ where
     }
 }
 
-impl<'a, T: Eq + AsRef<U>, U: 'a + Eq + Hash + ?Sized> ExactSizeIterator for RowIterator<'a, T, U> {
+impl<'a, T, Ret> ExactSizeIterator for RowIterator<'a, T, Ret>
+where
+    T: Eq + AsRef<Ret>,
+    Ret: 'a + Eq + Hash + ?Sized,
+{
     fn len(&self) -> usize {
         self.matrix.rows
     }
@@ -384,9 +393,10 @@ where
     }
 }
 
-impl<'a, F, T: Eq> Iterator for CellIterator<'a, F, T>
+impl<'a, F, T> Iterator for CellIterator<'a, F, T>
 where
     F: Fn(&MatrixCell) -> Key,
+    T: Eq,
 {
     type Item = &'a MatrixCell;
 
@@ -440,9 +450,10 @@ where
     }
 }
 
-impl<'a, F, T: Eq> Iterator for HeaderCellIterator<'a, F, T>
+impl<'a, F, T> Iterator for HeaderCellIterator<'a, F, T>
 where
     F: Fn(&MatrixCell) -> Key,
+    T: Eq,
 {
     type Item = &'a HeaderCell<T>;
 

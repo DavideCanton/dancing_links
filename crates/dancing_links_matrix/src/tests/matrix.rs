@@ -43,7 +43,7 @@ fn test_iterator() {
 
 #[test]
 fn test_iterator_no_rows() {
-    let matrix = MatrixBuilder::new()
+    let matrix = MatrixBuilder
         .add_column("1")
         .add_column("2")
         .add_column("3")
@@ -244,7 +244,7 @@ fn test_cell_iterator_down(include_start: bool) {
 }
 
 fn build_matrix() -> DancingLinksMatrix<String> {
-    MatrixBuilder::new()
+    MatrixBuilder
         .add_column(1.to_string())
         .add_column(2.to_string())
         .add_column(3.to_string())
