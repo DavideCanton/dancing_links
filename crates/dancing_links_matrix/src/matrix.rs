@@ -10,7 +10,7 @@ use rand::{thread_rng, Rng};
 
 use crate::{
     allocator::{Allocator, VecAllocator},
-    cells::{Cell, CellRow, HeaderCell, HeaderName},
+    cells::{MatrixCell, CellRow, HeaderCell, HeaderName},
     keys::{HeaderKey, Key},
 };
 
@@ -46,7 +46,7 @@ pub struct DancingLinksMatrix<T> {
     pub(crate) rows: usize,
     pub(crate) columns: usize,
     pub(crate) headers: VecAllocator<HeaderCell<T>, HeaderKey>,
-    pub(crate) cells: VecAllocator<Cell, Key>,
+    pub(crate) cells: VecAllocator<MatrixCell, Key>,
 }
 
 impl<T: Eq> DancingLinksMatrix<T> {
@@ -138,16 +138,16 @@ impl<T: Eq> DancingLinksMatrix<T> {
         cell_l.right = header_cell_index;
     }
 
-    pub(crate) fn iterate_cells<F: Fn(&Cell) -> Key>(
+    pub(crate) fn iterate_cells<F: Fn(&MatrixCell) -> Key>(
         &self,
         start: Key,
         getter: F,
         include_start: bool,
-    ) -> impl Iterator<Item = &Cell> {
+    ) -> impl Iterator<Item = &MatrixCell> {
         CellIterator::new(self, start, getter, include_start)
     }
 
-    pub(crate) fn iterate_headers<F: Fn(&Cell) -> Key>(
+    pub(crate) fn iterate_headers<F: Fn(&MatrixCell) -> Key>(
         &self,
         start: HeaderKey,
         getter: F,
@@ -187,11 +187,11 @@ impl<T: Eq> DancingLinksMatrix<T> {
             .map(|h| h.key)
     }
 
-    pub(crate) fn cell(&self, key: Key) -> &Cell {
+    pub(crate) fn cell(&self, key: Key) -> &MatrixCell {
         &self.cells[key]
     }
 
-    pub(crate) fn cell_mut(&mut self, key: Key) -> &mut Cell {
+    pub(crate) fn cell_mut(&mut self, key: Key) -> &mut MatrixCell {
         &mut self.cells[key]
     }
 
@@ -365,7 +365,7 @@ pub(crate) struct CellIterator<'a, F, T> {
 
 impl<'a, F, T> CellIterator<'a, F, T>
 where
-    F: Fn(&Cell) -> Key,
+    F: Fn(&MatrixCell) -> Key,
 {
     fn new(
         matrix: &'a DancingLinksMatrix<T>,
@@ -386,9 +386,9 @@ where
 
 impl<'a, F, T: Eq> Iterator for CellIterator<'a, F, T>
 where
-    F: Fn(&Cell) -> Key,
+    F: Fn(&MatrixCell) -> Key,
 {
-    type Item = &'a Cell;
+    type Item = &'a MatrixCell;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.end {
@@ -421,7 +421,7 @@ pub(crate) struct HeaderCellIterator<'a, F, T> {
 
 impl<'a, F, T> HeaderCellIterator<'a, F, T>
 where
-    F: Fn(&Cell) -> Key,
+    F: Fn(&MatrixCell) -> Key,
 {
     fn new(
         matrix: &'a DancingLinksMatrix<T>,
@@ -442,7 +442,7 @@ where
 
 impl<'a, F, T: Eq> Iterator for HeaderCellIterator<'a, F, T>
 where
-    F: Fn(&Cell) -> Key,
+    F: Fn(&MatrixCell) -> Key,
 {
     type Item = &'a HeaderCell<T>;
 

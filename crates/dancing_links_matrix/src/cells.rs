@@ -45,7 +45,7 @@ impl Display for CellRow {
 
 /// The cell of the matrix.
 #[derive(Debug)]
-pub(crate) struct Cell {
+pub(crate) struct MatrixCell {
     /// The key of the cell.
     pub(crate) key: Key,
     /// The key of the cell above the current cell.
@@ -62,7 +62,7 @@ pub(crate) struct Cell {
     pub(crate) row: CellRow,
 }
 
-impl Cell {
+impl MatrixCell {
     /// Creates a new cell.
     ///
     /// # Arguments
@@ -70,8 +70,8 @@ impl Cell {
     /// * `key` - The key of the cell.
     /// * `header` - The key of the header cell.
     /// * `row` - The row of the cell.
-    pub fn new(key: Key, header: HeaderKey, row: CellRow) -> Cell {
-        Cell {
+    pub fn new(key: Key, header: HeaderKey, row: CellRow) -> MatrixCell {
+        MatrixCell {
             key,
             up: key,
             down: key,

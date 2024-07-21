@@ -1,10 +1,10 @@
-use crate::cells::{Cell, CellRow, HeaderCell, HeaderName};
+use crate::cells::{MatrixCell, CellRow, HeaderCell, HeaderName};
 
 use HeaderName::{First as F, Other as O};
 
 #[test]
 fn test_cell_new() {
-    let cell = Cell::new(42.into(), 2.into(), CellRow::Data(3));
+    let cell = MatrixCell::new(42.into(), 2.into(), CellRow::Data(3));
     assert_eq!(cell.key, 42.into());
     assert_eq!(cell.up, 42.into());
     assert_eq!(cell.down, 42.into());

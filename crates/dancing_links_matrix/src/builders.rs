@@ -10,7 +10,7 @@ use itertools::Itertools;
 
 use crate::{
     allocator::{Allocator, VecAllocator},
-    cells::{Cell, CellRow, HeaderCell, HeaderName},
+    cells::{MatrixCell, CellRow, HeaderCell, HeaderName},
     keys::{HeaderKey, Key},
     matrix::{ColumnSpec, DancingLinksMatrix},
 };
@@ -278,7 +278,7 @@ impl<T: Eq> MatrixRowBuilder<T> {
 struct BuildingMatrix<T> {
     pub(crate) header_key: HeaderKey,
     pub(crate) headers: VecAllocator<HeaderCell<T>, HeaderKey>,
-    pub(crate) cells: VecAllocator<Cell, Key>,
+    pub(crate) cells: VecAllocator<MatrixCell, Key>,
     pub(crate) rows: usize,
     pub(crate) columns: usize,
 }
@@ -286,7 +286,7 @@ struct BuildingMatrix<T> {
 impl<T> BuildingMatrix<T> {
     fn add_cell(&mut self, header_cell_key: HeaderKey, row: CellRow) -> Key {
         let cell_key = self.cells.next_key();
-        let cell = Cell::new(cell_key, header_cell_key, row);
+        let cell = MatrixCell::new(cell_key, header_cell_key, row);
         let actual_key = self.cells.insert(cell);
         assert_eq!(actual_key, cell_key);
         actual_key
@@ -313,7 +313,7 @@ impl<T> BuildingMatrix<T> {
         self.cell_mut(down).up = up;
     }
 
-    fn cell_mut(&mut self, key: Key) -> &mut Cell {
+    fn cell_mut(&mut self, key: Key) -> &mut MatrixCell {
         &mut self.cells[key]
     }
 
