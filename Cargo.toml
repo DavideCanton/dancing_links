@@ -3,7 +3,7 @@ members = [
     "crates/dancing_links_matrix",
     "crates/sudoku",
     "crates/nqueens",
-    "crates/cmd_common"
+    "crates/cmd_common",
 ]
 resolver = "2"
 
@@ -13,3 +13,7 @@ logging_timer = "1.1.1"
 simple_logger = "5.0.0"
 log = "0.4.14"
 clap = { version = "4.5.8", features = ["derive"] }
+
+[profile.profiling]
+inherits = "release"
+debug = 1
