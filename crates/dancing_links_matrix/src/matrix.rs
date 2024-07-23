@@ -9,8 +9,8 @@ use itertools::Itertools;
 use rand::{thread_rng, Rng};
 
 use crate::{
-    index::{Allocator, VecAllocator},
-    cells::{MatrixCell, CellRow, HeaderCell, HeaderName},
+    cells::{CellRow, HeaderCell, HeaderName, MatrixCell},
+    index::{Index, IndexOps, VecIndex},
     keys::{HeaderKey, Key},
 };
 
@@ -45,8 +45,8 @@ pub struct DancingLinksMatrix<T> {
     pub(crate) header_key: HeaderKey,
     pub(crate) rows: usize,
     pub(crate) columns: usize,
-    pub(crate) headers: VecAllocator<HeaderCell<T>, HeaderKey>,
-    pub(crate) cells: VecAllocator<MatrixCell, Key>,
+    pub(crate) headers: VecIndex<HeaderCell<T>, HeaderKey>,
+    pub(crate) cells: VecIndex<MatrixCell, Key>,
 }
 
 impl<T: Eq> DancingLinksMatrix<T> {
@@ -114,6 +114,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
             .flat_map(|j| self.iterate_cells(j.key, |c| c.left, false))
             .map(|j| j.key)
             .collect_vec();
+
         for j in v.iter() {
             let cell = self.cell(*j);
 
@@ -189,19 +190,19 @@ impl<T: Eq> DancingLinksMatrix<T> {
     }
 
     pub(crate) fn cell(&self, key: Key) -> &MatrixCell {
-        &self.cells[key]
+        self.cells.get(key)
     }
 
     pub(crate) fn cell_mut(&mut self, key: Key) -> &mut MatrixCell {
-        &mut self.cells[key]
+        self.cells.get_mut(key)
     }
 
     pub(crate) fn header_mut(&mut self, key: HeaderKey) -> &mut HeaderCell<T> {
-        &mut self.headers[key]
+        self.headers.get_mut(key)
     }
 
     pub(crate) fn header(&self, key: HeaderKey) -> &HeaderCell<T> {
-        &self.headers[key]
+        self.headers.get(key)
     }
 }
 

@@ -7,8 +7,8 @@
 use itertools::Itertools;
 
 use crate::{
-    index::{Allocator, VecAllocator},
-    cells::{MatrixCell, CellRow, HeaderCell, HeaderName},
+    cells::{CellRow, HeaderCell, HeaderName, MatrixCell},
+    index::{IndexBuilder, IndexOps, VecIndexBuilder},
     keys::{HeaderKey, Key},
     matrix::{ColumnSpec, DancingLinksMatrix},
 };
@@ -26,9 +26,12 @@ impl MatrixBuilder {
     /// Returns a [`MatrixRowBuilder`], that can be used to add rows to the matrix.
     ///
     /// [`MatrixBuilder`]: MatrixBuilder
-    pub fn from_iterable<T: Eq, I: Into<ColumnSpec<T>>, IT: IntoIterator<Item = I>>(
-        iterable: IT,
-    ) -> MatrixRowBuilder<T> {
+    pub fn from_iterable<T>(
+        iterable: impl IntoIterator<Item = impl Into<ColumnSpec<T>>>,
+    ) -> MatrixRowBuilder<T>
+    where
+        T: Eq,
+    {
         iterable.into_iter().collect::<MatrixRowBuilder<T>>()
     }
 
@@ -37,7 +40,10 @@ impl MatrixBuilder {
     /// Returns a [`MatrixColBuilder`], that can be used to add more columns to the matrix.
     ///
     /// [`MatrixBuilder`]: MatrixBuilder
-    pub fn add_column<T: Eq, I: Into<ColumnSpec<T>>>(self, spec: I) -> MatrixColBuilder<T> {
+    pub fn add_column<T>(self, spec: impl Into<ColumnSpec<T>>) -> MatrixColBuilder<T>
+    where
+        T: Eq,
+    {
         MatrixColBuilder::new().add_column(spec)
     }
 }
@@ -53,7 +59,10 @@ pub struct MatrixColBuilder<T> {
 }
 
 impl<T: Eq, I: Into<ColumnSpec<T>>> FromIterator<I> for MatrixColBuilder<T> {
-    fn from_iter<IT: IntoIterator<Item = I>>(iter: IT) -> Self {
+    fn from_iter<IT>(iter: IT) -> Self
+    where
+        IT: IntoIterator<Item = I>,
+    {
         let iter = iter.into_iter();
 
         let mut builder = MatrixColBuilder::new();
@@ -75,7 +84,7 @@ impl<T: Eq> MatrixColBuilder<T> {
     /// Returns `self`, for chaining.
     ///
     /// [`MatrixColBuilder`]: MatrixColBuilder
-    pub fn add_column<I: Into<ColumnSpec<T>>>(mut self, spec: I) -> MatrixColBuilder<T> {
+    pub fn add_column(mut self, spec: impl Into<ColumnSpec<T>>) -> MatrixColBuilder<T> {
         self.columns.push(spec.into());
         self
     }
@@ -91,12 +100,12 @@ impl<T: Eq> MatrixColBuilder<T> {
         }
         let column_names = self.columns;
 
-        let headers = VecAllocator::with_capacity(column_names.len() + 1);
+        let headers = VecIndexBuilder::with_capacity(column_names.len() + 1);
 
         let mut matrix = BuildingMatrix {
             header_key: headers.next_key(),
             headers,
-            cells: VecAllocator::new(),
+            cells: VecIndexBuilder::new(),
             rows: 0,
             columns: column_names.len(),
         };
@@ -118,8 +127,6 @@ impl<T: Eq> MatrixColBuilder<T> {
 
         matrix.link_right(prev_cell_key, header_cell_key);
 
-        matrix.headers.finalize();
-
         MatrixRowBuilder { matrix }
     }
 }
@@ -128,15 +135,25 @@ pub struct MatrixRowBuilder<T> {
     matrix: BuildingMatrix<T>,
 }
 
-impl<T: Eq, I: Into<ColumnSpec<T>>> FromIterator<I> for MatrixRowBuilder<T> {
-    fn from_iter<IT: IntoIterator<Item = I>>(iter: IT) -> Self {
+impl<T, I> FromIterator<I> for MatrixRowBuilder<T>
+where
+    T: Eq,
+    I: Into<ColumnSpec<T>>,
+{
+    fn from_iter<IT>(iter: IT) -> Self
+    where
+        IT: IntoIterator<Item = I>,
+    {
         iter.into_iter()
             .collect::<MatrixColBuilder<T>>()
             .end_columns()
     }
 }
 
-impl<T: Eq> MatrixRowBuilder<T> {
+impl<T> MatrixRowBuilder<T>
+where
+    T: Eq,
+{
     /// Add a row to the [`MatrixRowBuilder`] using key values.
     ///
     /// Keys must be of a type that is convertible into an usize, and must be in the range from 1 to `n`,
@@ -246,13 +263,11 @@ impl<T: Eq> MatrixRowBuilder<T> {
     }
 
     pub fn build(self) -> DancingLinksMatrix<T> {
-        let mut matrix = self.matrix;
-
-        matrix.cells.finalize();
+        let matrix = self.matrix;
 
         DancingLinksMatrix {
-            headers: matrix.headers,
-            cells: matrix.cells,
+            headers: matrix.headers.finalize(),
+            cells: matrix.cells.finalize(),
             rows: matrix.rows,
             columns: matrix.columns,
             header_key: matrix.header_key,
@@ -262,8 +277,8 @@ impl<T: Eq> MatrixRowBuilder<T> {
 
 struct BuildingMatrix<T> {
     pub(crate) header_key: HeaderKey,
-    pub(crate) headers: VecAllocator<HeaderCell<T>, HeaderKey>,
-    pub(crate) cells: VecAllocator<MatrixCell, Key>,
+    pub(crate) headers: VecIndexBuilder<HeaderCell<T>, HeaderKey>,
+    pub(crate) cells: VecIndexBuilder<MatrixCell, Key>,
     pub(crate) rows: usize,
     pub(crate) columns: usize,
 }
@@ -299,10 +314,10 @@ impl<T> BuildingMatrix<T> {
     }
 
     fn cell_mut(&mut self, key: Key) -> &mut MatrixCell {
-        &mut self.cells[key]
+        self.cells.get_mut(key)
     }
 
     fn header_mut(&mut self, key: HeaderKey) -> &mut HeaderCell<T> {
-        &mut self.headers[key]
+        self.headers.get_mut(key)
     }
 }
