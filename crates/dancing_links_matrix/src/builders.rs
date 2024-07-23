@@ -7,7 +7,7 @@
 use itertools::Itertools;
 
 use crate::{
-    allocator::{Allocator, VecAllocator},
+    index::{Allocator, VecAllocator},
     cells::{MatrixCell, CellRow, HeaderCell, HeaderName},
     keys::{HeaderKey, Key},
     matrix::{ColumnSpec, DancingLinksMatrix},

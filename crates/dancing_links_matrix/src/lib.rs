@@ -1,7 +1,6 @@
-mod allocator;
-
 mod builders;
 mod cells;
+mod index;
 mod keys;
 mod matrix;
 mod solver;

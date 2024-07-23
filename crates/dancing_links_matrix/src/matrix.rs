@@ -9,7 +9,7 @@ use itertools::Itertools;
 use rand::{thread_rng, Rng};
 
 use crate::{
-    allocator::{Allocator, VecAllocator},
+    index::{Allocator, VecAllocator},
     cells::{MatrixCell, CellRow, HeaderCell, HeaderName},
     keys::{HeaderKey, Key},
 };
