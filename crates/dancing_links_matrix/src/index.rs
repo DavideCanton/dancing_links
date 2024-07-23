@@ -124,10 +124,10 @@ impl<T, K: Into<usize>> IndexOps<T, K> for VecIndex<T, K> {
 
 impl<T, K: Into<usize>> Index<T, K> for VecIndex<T, K> {
     fn get(&self, key: K) -> &T {
-        self.buffer.get(key.into()).unwrap()
+        unsafe { self.buffer.get_unchecked(key.into()) }
     }
 
     fn get_mut(&mut self, key: K) -> &mut T {
-        self.buffer.get_mut(key.into()).unwrap()
+        unsafe { self.buffer.get_unchecked_mut(key.into()) }
     }
 }
