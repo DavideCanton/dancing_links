@@ -1,8 +1,9 @@
 //! The module contains the implementation of the cell and header cells.
 
-use std::fmt::{self, Display};
-
-use crate::keys::{HeaderKey, Key};
+use std::{
+    fmt::{self, Display},
+    ptr::null_mut,
+};
 
 /// The row of the cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -43,26 +44,37 @@ impl Display for CellRow {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct ProtoCell {
+    pub(crate) key: usize,
+    pub(crate) up: usize,
+    pub(crate) down: usize,
+    pub(crate) left: usize,
+    pub(crate) right: usize,
+    pub(crate) header: usize,
+    pub(crate) row: CellRow,
+}
+
 /// The cell of the matrix.
 #[derive(Debug)]
-pub(crate) struct MatrixCell {
+pub(crate) struct MatrixCell<T> {
     /// The key of the cell.
-    pub(crate) key: Key,
+    pub(crate) key: usize,
     /// The key of the cell above the current cell.
-    pub(crate) up: Key,
+    pub(crate) up: *mut MatrixCell<T>,
     /// The key of the cell below the current cell.
-    pub(crate) down: Key,
+    pub(crate) down: *mut MatrixCell<T>,
     /// The key of the cell to the left of the current cell.
-    pub(crate) left: Key,
+    pub(crate) left: *mut MatrixCell<T>,
     /// The key of the cell to the right of the current cell.
-    pub(crate) right: Key,
+    pub(crate) right: *mut MatrixCell<T>,
     /// The key of the header cell.
-    pub(crate) header: HeaderKey,
+    pub(crate) header: *mut HeaderCell<T>,
     /// The row of the cell.
     pub(crate) row: CellRow,
 }
 
-impl MatrixCell {
+impl<T> MatrixCell<T> {
     /// Creates a new cell.
     ///
     /// # Arguments
@@ -70,13 +82,13 @@ impl MatrixCell {
     /// * `key` - The key of the cell.
     /// * `header` - The key of the header cell.
     /// * `row` - The row of the cell.
-    pub fn new(key: Key, header: HeaderKey, row: CellRow) -> MatrixCell {
+    pub fn new(key: usize, header: *mut HeaderCell<T>, row: CellRow) -> MatrixCell<T> {
         MatrixCell {
             key,
-            up: key,
-            down: key,
-            left: key,
-            right: key,
+            up: null_mut(),
+            down: null_mut(),
+            left: null_mut(),
+            right: null_mut(),
             header,
             row,
         }
@@ -102,19 +114,27 @@ impl<T: Display> Display for HeaderName<T> {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct ProtoHeaderCell<T> {
+    pub(crate) key: usize,
+    pub(crate) name: HeaderName<T>,
+    pub(crate) size: usize,
+    pub(crate) cell: usize,
+}
+
 /// The header cell of the matrix.
 ///
 /// Contains the key of a physical cell linked to the header cell.
 #[derive(Debug)]
 pub(crate) struct HeaderCell<T> {
     /// The key of the header cell.
-    pub(crate) key: HeaderKey,
+    pub(crate) key: usize,
     /// The name of the header cell.
     pub(crate) name: HeaderName<T>,
     /// The size of the header cell.
     pub(crate) size: usize,
     /// The key of the cell.
-    pub(crate) cell: Key,
+    pub(crate) cell: *mut MatrixCell<T>,
 }
 
 impl<T> HeaderCell<T> {
@@ -125,12 +145,12 @@ impl<T> HeaderCell<T> {
     /// * `name` - The name of the header cell.
     /// * `key` - The key of the header cell.
     /// * `cell_key` - The key of the linked cell.
-    pub fn new(name: HeaderName<T>, key: HeaderKey, cell_key: Key) -> HeaderCell<T> {
+    pub fn new(name: HeaderName<T>, key: usize) -> HeaderCell<T> {
         HeaderCell {
             key,
             name,
             size: 0,
-            cell: cell_key,
+            cell: null_mut(),
         }
     }
 

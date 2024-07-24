@@ -4,12 +4,13 @@
 //!
 //! [`DancingLinksMatrix`]: crate::matrix::DancingLinksMatrix
 
+use std::ptr::null_mut;
+
 use itertools::Itertools;
 
 use crate::{
-    cells::{CellRow, HeaderCell, HeaderName, MatrixCell},
+    cells::{CellRow, HeaderCell, HeaderName, MatrixCell, ProtoCell, ProtoHeaderCell},
     index::{IndexBuilder, IndexOps, VecIndexBuilder},
-    keys::{HeaderKey, Key},
     matrix::{ColumnSpec, DancingLinksMatrix},
 };
 
@@ -162,7 +163,7 @@ where
     /// Use `add_sorted_row_key` if the keys are already sorted, to avoid sorting them twice.
     ///
     /// [`MatrixRowBuilder`]: MatrixRowBuilder
-    pub fn add_row_key(self, row: impl IntoIterator<Item = impl Into<HeaderKey> + Ord>) -> Self {
+    pub fn add_row_key(self, row: impl IntoIterator<Item = usize>) -> Self {
         let mut sorted = row.into_iter().collect_vec();
         sorted.sort_unstable();
         self.add_sorted_row_key(sorted)
@@ -188,8 +189,8 @@ where
     /// where `n` is the number of columns in the matrix, in the order that the columns were added.
     ///
     /// [`MatrixRowBuilder`]: MatrixRowBuilder
-    pub fn add_sorted_row_key(self, row: impl IntoIterator<Item = impl Into<HeaderKey>>) -> Self {
-        self._add_sorted_row(row.into_iter().map(|v| v.into()))
+    pub fn add_sorted_row_key(self, row: impl IntoIterator<Item = usize>) -> Self {
+        self._add_sorted_row(row)
     }
 
     /// Add a sorted row to the [`MatrixRowBuilder`].
@@ -223,7 +224,7 @@ where
         self._add_sorted_row(to_add)
     }
 
-    fn _add_sorted_row(mut self, row: impl IntoIterator<Item = HeaderKey>) -> Self {
+    fn _add_sorted_row(mut self, row: impl IntoIterator<Item = usize>) -> Self {
         let mx = &mut self.matrix;
 
         let mut cell_index = None;
@@ -265,59 +266,121 @@ where
     pub fn build(self) -> DancingLinksMatrix<T> {
         let matrix = self.matrix;
 
+        let mut fh = matrix.headers.finalize(|v| {
+            let mut res = Vec::with_capacity(v.len());
+            for h in v {
+                let mut hc = HeaderCell::new(h.name, h.size);
+                // TODO using the offset as pointer
+                hc.cell = unsafe { null_mut::<MatrixCell<T>>().add(h.cell) };
+                res.push(hc);
+            }
+            res
+        });
+
+        let fc = matrix.cells.finalize(|v| {
+            let mut boundaries = Vec::with_capacity(v.len());
+            let mut cells = Vec::with_capacity(v.len());
+
+            for c in v {
+                boundaries.push((c.up, c.down, c.left, c.right));
+
+                let h = fh.get_ptr(c.header);
+                cells.push(MatrixCell::new(c.key, h, c.row));
+            }
+
+            let cell_ptr = cells.as_mut_ptr();
+
+            for (cell, (u, d, l, r)) in cells.iter_mut().zip(boundaries) {
+                unsafe {
+                    let addr = cell_ptr.add(u);
+                    cell.up = addr;
+
+                    let addr = cell_ptr.add(d);
+                    cell.down = addr;
+
+                    let addr = cell_ptr.add(l);
+                    cell.left = addr;
+
+                    let addr = cell_ptr.add(r);
+                    cell.right = addr;
+                }
+            }
+
+            cells
+        });
+
+        for h in fh.iter_mut() {
+            h.cell = fc.get_ptr(h.cell as usize);
+        }
+
+        let header_key = fh.get_ptr(matrix.header_key);
+
         DancingLinksMatrix {
-            headers: matrix.headers.finalize(),
-            cells: matrix.cells.finalize(),
+            headers: fh,
+            cells: fc,
             rows: matrix.rows,
             columns: matrix.columns,
-            header_key: matrix.header_key,
+            header_key,
         }
     }
 }
 
 struct BuildingMatrix<T> {
-    pub(crate) header_key: HeaderKey,
-    pub(crate) headers: VecIndexBuilder<HeaderCell<T>, HeaderKey>,
-    pub(crate) cells: VecIndexBuilder<MatrixCell, Key>,
+    pub(crate) header_key: usize,
+    pub(crate) headers: VecIndexBuilder<ProtoHeaderCell<T>>,
+    pub(crate) cells: VecIndexBuilder<ProtoCell>,
     pub(crate) rows: usize,
     pub(crate) columns: usize,
 }
 
 impl<T> BuildingMatrix<T> {
-    fn add_cell(&mut self, header_cell_key: HeaderKey, row: CellRow) -> Key {
+    fn add_cell(&mut self, header_cell_key: usize, row: CellRow) -> usize {
         let cell_key = self.cells.next_key();
-        let cell = MatrixCell::new(cell_key, header_cell_key, row);
+        let cell = ProtoCell {
+            key: cell_key,
+            header: header_cell_key,
+            row,
+            left: cell_key,
+            right: cell_key,
+            up: cell_key,
+            down: cell_key,
+        };
         let actual_key = self.cells.insert(cell);
         assert_eq!(actual_key, cell_key);
         actual_key
     }
 
-    fn add_header(&mut self, name: HeaderName<T>) -> (HeaderKey, Key) {
+    fn add_header(&mut self, name: HeaderName<T>) -> (usize, usize) {
         let header_key = self.headers.next_key();
         let header_cell_key = self.add_cell(header_key, CellRow::Header);
 
-        let header = HeaderCell::new(name, header_key, header_cell_key);
+        let header = ProtoHeaderCell {
+            key: header_key,
+            name,
+            size: 0,
+            cell: header_cell_key,
+        };
         let actual_header_key = self.headers.insert(header);
         assert_eq!(header_key, actual_header_key);
 
         (actual_header_key, header_cell_key)
     }
 
-    fn link_right(&mut self, left: Key, right: Key) {
+    fn link_right(&mut self, left: usize, right: usize) {
         self.cell_mut(left).right = right;
         self.cell_mut(right).left = left;
     }
 
-    fn link_down(&mut self, up: Key, down: Key) {
+    fn link_down(&mut self, up: usize, down: usize) {
         self.cell_mut(up).down = down;
         self.cell_mut(down).up = up;
     }
 
-    fn cell_mut(&mut self, key: Key) -> &mut MatrixCell {
+    fn cell_mut(&mut self, key: usize) -> &mut ProtoCell {
         self.cells.get_mut(key)
     }
 
-    fn header_mut(&mut self, key: HeaderKey) -> &mut HeaderCell<T> {
+    fn header_mut(&mut self, key: usize) -> &mut ProtoHeaderCell<T> {
         self.headers.get_mut(key)
     }
 }

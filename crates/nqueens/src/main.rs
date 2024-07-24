@@ -1,8 +1,7 @@
 use clap::Parser;
 use cmd_common::{init_log, CommonArgs};
 use dancing_links_matrix::{
-    ColumnSpec, DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder,
-    RecursiveAlgorithmXSolver, Solution,
+    ColumnSpec, DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder, Solution,
 };
 use itertools::Itertools;
 use logging_timer::time;
@@ -64,16 +63,6 @@ fn solve(matrix: DancingLinksMatrix<String>, n: usize) {
     }
 }
 
-#[time("info")]
-fn solve_rec(matrix: DancingLinksMatrix<String>, n: usize) {
-    let mut solver = RecursiveAlgorithmXSolver::new(matrix, move |sol| print_sol(n, sol), true);
-    let found = solver.solve();
-
-    if !found {
-        println!("No solution found");
-    }
-}
-
 fn print_sol(n: usize, sol: &Solution<String>) -> bool {
     let mut pos = vec![0; n];
 
@@ -109,9 +98,5 @@ fn main() {
     let n = args.n;
     let matrix = build_matrix(n);
 
-    if args.common_args.recursive {
-        solve_rec(matrix, n);
-    } else {
-        solve(matrix, n);
-    }
+    solve(matrix, n);
 }

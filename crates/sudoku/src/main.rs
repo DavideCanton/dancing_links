@@ -9,8 +9,7 @@ use std::{
 use clap::Parser;
 use cmd_common::{init_log, CommonArgs};
 use dancing_links_matrix::{
-    DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder, RecursiveAlgorithmXSolver,
-    Solution,
+    DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder, Solution,
 };
 use itertools::Itertools;
 use logging_timer::time;
@@ -107,21 +106,6 @@ fn print_sol(sol: &Solution<String>) {
 }
 
 #[time]
-fn solve_rec(matrix: DancingLinksMatrix<String>) {
-    let mut solver = RecursiveAlgorithmXSolver::new(
-        matrix,
-        |sol| {
-            print_sol(sol);
-            true
-        },
-        true,
-    );
-    if !solver.solve() {
-        println!("No solution found");
-    }
-}
-
-#[time]
 fn solve_it(matrix: DancingLinksMatrix<String>) {
     let mut solver = IterativeAlgorithmXSolver::new(matrix, true, true);
     let solutions = solver.solve();
@@ -209,9 +193,5 @@ fn main() {
     let known = load_board(&path);
     let matrix = build_matrix(known);
 
-    if args.common_args.recursive {
-        solve_rec(matrix);
-    } else {
-        solve_it(matrix);
-    }
+    solve_it(matrix);
 }
