@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{solver::IterativeAlgorithmXSolver, DancingLinksMatrix, MatrixBuilder};
 
+#[test]
 fn solve_single_sol() {
     let matrix = MatrixBuilder::from_iterable([1, 2, 3, 4, 5, 6])
         .add_row([1, 2])
@@ -10,8 +11,7 @@ fn solve_single_sol() {
         .add_row([2, 3, 5])
         .build();
 
-    let (found, solutions) = solver("iter", matrix, true);
-    assert!(found);
+    let solutions = solve(matrix, true);
     assert!(solutions.len() == 1);
 
     let solution = &solutions[0];
@@ -23,6 +23,7 @@ fn solve_single_sol() {
     assert_eq!(solution[&3], vec![5, 6]);
 }
 
+#[test]
 fn solve_multiple_sol() {
     let matrix = MatrixBuilder::from_iterable([1, 2, 3, 4, 5, 6])
         .add_row([1, 2])
@@ -32,8 +33,7 @@ fn solve_multiple_sol() {
         .add_row([1, 4, 6])
         .build();
 
-    let (found, solutions) = solver("iter", matrix, false);
-    assert!(found);
+    let solutions = solve(matrix, false);
     assert_eq!(solutions.len(), 2);
 
     let solution = solutions.iter().find(|v| v.len() == 3).unwrap();
@@ -52,6 +52,7 @@ fn solve_multiple_sol() {
     assert_eq!(solution[&5], vec![1, 4, 6]);
 }
 
+#[test]
 fn solve_first_sol() {
     let matrix = MatrixBuilder::from_iterable([1, 2, 3, 4])
         .add_row([1, 2])
@@ -60,8 +61,7 @@ fn solve_first_sol() {
         .add_row([1, 4])
         .build();
 
-    let (found, solutions) = solver("iter", matrix, true);
-    assert!(found);
+    let solutions = solve(matrix, true);
     assert_eq!(solutions.len(), 1);
 
     let solution = &solutions[0];
@@ -78,25 +78,7 @@ fn solve_first_sol() {
     }
 }
 
-fn solver(
-    solver_type: &str,
-    matrix: DancingLinksMatrix<usize>,
-    stop: bool,
-) -> (bool, Vec<HashMap<usize, Vec<usize>>>) {
-    match solver_type {
-        "iter" => iter_solver(matrix, stop),
-        _ => unreachable!(),
-    }
-}
-
-fn iter_solver(
-    matrix: DancingLinksMatrix<usize>,
-    stop: bool,
-) -> (bool, Vec<HashMap<usize, Vec<usize>>>) {
+fn solve(matrix: DancingLinksMatrix<usize>, stop: bool) -> Vec<HashMap<usize, Vec<usize>>> {
     let solutions = IterativeAlgorithmXSolver::new(matrix, true, stop).solve();
-
-    (
-        !solutions.is_empty(),
-        solutions.into_iter().map(|v| v.solution_map).collect(),
-    )
+    solutions.into_iter().map(|v| v.solution_map).collect()
 }

@@ -10,7 +10,7 @@ use rand::{thread_rng, Rng};
 
 use crate::{
     cells::{CellRow, HeaderCell, HeaderName, MatrixCell},
-    index::{IndexOps, VecIndex},
+    index::{Index, IndexOps, VecIndex},
 };
 
 pub struct ColumnSpec<T> {
@@ -135,7 +135,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
         HeaderCellIterator::new(start, direction, include_start)
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn locate_cell<R: Into<CellRow>, C: Eq + ?Sized>(
         &self,
         row: R,
@@ -153,7 +153,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn locate_header<C: Eq + ?Sized>(&self, column: &C) -> Option<*mut HeaderCell<T>>
     where
         T: AsRef<C>,
@@ -404,6 +404,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 pub(crate) enum HeaderIteratorDirection {
     Right,
     Left,

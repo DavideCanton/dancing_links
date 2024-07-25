@@ -37,9 +37,9 @@ pub trait IndexBuilder<T>: IndexOps<T> {
 
 /// A trait for allocating values of type `T` and returning a key of type `K`.
 pub trait Index<T>: IndexOps<T> {
-    fn get(&self, key: usize) -> &T;
+    unsafe fn get_mut_ptr(&self, k: usize) -> *mut T;
 
-    fn get_mut(&mut self, key: usize) -> &mut T;
+    fn get(&self, k: usize) -> &T;
 }
 
 pub struct VecIndexBuilder<T> {
@@ -101,19 +101,21 @@ pub struct VecIndex<T> {
 }
 
 impl<T> VecIndex<T> {
-    pub(crate) fn get_ptr(&self, k: usize) -> *mut T {
-        unsafe { (*self.buffer.get()).as_mut_ptr().add(k) }
-    }
-
-    pub(crate) fn get(&self, k: usize) -> &T {
-        unsafe { (*self.buffer.get()).get(k).unwrap() }
-    }
-
     pub(crate) fn iter_mut<'s>(&'s mut self) -> impl Iterator<Item = &'s mut T> + 's
     where
         T: 's,
     {
         unsafe { (*self.buffer.get()).iter_mut() }
+    }
+}
+
+impl<T> Index<T> for VecIndex<T> {
+    unsafe fn get_mut_ptr(&self, k: usize) -> *mut T {
+        (*self.buffer.get()).as_mut_ptr().add(k)
+    }
+
+    fn get(&self, k: usize) -> &T {
+        unsafe { (*self.buffer.get()).get(k).unwrap() }
     }
 }
 

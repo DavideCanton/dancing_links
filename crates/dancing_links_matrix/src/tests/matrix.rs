@@ -1,26 +1,39 @@
 use itertools::Itertools;
 use test_case::test_matrix;
 
-use crate::{cells::HeaderName, matrix::RowIterator, DancingLinksMatrix, MatrixBuilder};
+use crate::{
+    cells::HeaderName,
+    matrix::{CellIteratorDirection, HeaderIteratorDirection, RowIterator},
+    DancingLinksMatrix, MatrixBuilder,
+};
 use HeaderName::{First as F, Other as O};
+
+fn find_cell(mat: &DancingLinksMatrix<String>, row: usize, name: &str) -> Option<usize> {
+    unsafe { mat.locate_cell(row, name).map(|c| (*c).key) }
+}
+
+fn find_header(mat: &DancingLinksMatrix<String>, name: &str) -> Option<usize> {
+    unsafe { mat.locate_header(name).map(|h| (*h).key) }
+}
 
 #[test]
 fn test_locate_cell() {
     let matrix = build_matrix();
-    assert_eq!(matrix.locate_cell(1, "1").unwrap(), 4.into());
-    assert_eq!(matrix.locate_cell(1, "2").unwrap(), 5.into());
-    assert_eq!(matrix.locate_cell(1, "3"), None);
-    assert_eq!(matrix.locate_cell(2, "1").unwrap(), 6.into());
-    assert_eq!(matrix.locate_cell(2, "2"), None);
-    assert_eq!(matrix.locate_cell(2, "3").unwrap(), 7.into());
+
+    assert_eq!(find_cell(&matrix, 1, "1").unwrap(), 4);
+    assert_eq!(find_cell(&matrix, 1, "2").unwrap(), 5);
+    assert_eq!(find_cell(&matrix, 1, "3"), None);
+    assert_eq!(find_cell(&matrix, 2, "1").unwrap(), 6);
+    assert_eq!(find_cell(&matrix, 2, "2"), None);
+    assert_eq!(find_cell(&matrix, 2, "3").unwrap(), 7);
 }
 
 #[test]
 fn test_locate_header() {
     let matrix = build_matrix();
-    assert_eq!(matrix.locate_header("1").unwrap(), 1.into());
-    assert_eq!(matrix.locate_header("2").unwrap(), 2.into());
-    assert_eq!(matrix.locate_header("6"), None);
+    assert_eq!(find_header(&matrix, "1").unwrap(), 1);
+    assert_eq!(find_header(&matrix, "2").unwrap(), 2);
+    assert_eq!(find_header(&matrix, "6"), None);
 }
 
 #[test]
@@ -60,8 +73,12 @@ fn test_header_cell_iterator_right_from_first(include_start: bool) {
     let matrix = build_matrix();
 
     let actual: Vec<HeaderName<_>> = matrix
-        .iterate_headers(matrix.header_key, |cell| cell.right, include_start)
-        .map(|h| h.name.clone())
+        .iterate_headers(
+            matrix.header_key,
+            HeaderIteratorDirection::Right,
+            include_start,
+        )
+        .map(|h| unsafe { (*h).name.clone() })
         .collect();
 
     let mut exp = vec![O("1".to_string()), O("2".to_string()), O("3".to_string())];
@@ -78,8 +95,8 @@ fn test_header_cell_iterator_right(include_start: bool) {
     let key = matrix.locate_header("1").unwrap();
 
     let actual: Vec<HeaderName<_>> = matrix
-        .iterate_headers(key, |cell| cell.right, include_start)
-        .map(|h| h.name.clone())
+        .iterate_headers(key, HeaderIteratorDirection::Right, include_start)
+        .map(|h| unsafe { (*h).name.clone() })
         .collect();
 
     let mut exp = vec![O("2".to_string()), O("3".to_string()), F];
@@ -96,46 +113,10 @@ fn test_header_cell_iterator_left(include_start: bool) {
     let key = matrix.locate_header("1").unwrap();
 
     let actual: Vec<HeaderName<_>> = matrix
-        .iterate_headers(key, |cell| cell.left, include_start)
-        .map(|h| h.name.clone())
+        .iterate_headers(key, HeaderIteratorDirection::Left, include_start)
+        .map(|h| unsafe { (*h).name.clone() })
         .collect();
     let mut exp = vec![F, O("3".to_string()), O("2".to_string())];
-    if include_start {
-        exp.insert(0, O("1".to_string()));
-    }
-
-    assert_eq!(actual, exp);
-}
-
-#[test_matrix([true, false]; "include_start")]
-fn test_header_cell_iterator_up(include_start: bool) {
-    let matrix = build_matrix();
-    let key = matrix.locate_header("1").unwrap();
-
-    let actual: Vec<HeaderName<_>> = matrix
-        .iterate_headers(key, |c| c.up, include_start)
-        .map(|h| h.name.clone())
-        .collect();
-
-    let mut exp = vec![];
-    if include_start {
-        exp.insert(0, O("1".to_string()));
-    }
-
-    assert_eq!(actual, exp);
-}
-
-#[test_matrix([true, false]; "include_start")]
-fn test_header_cell_iterator_down(include_start: bool) {
-    let matrix = build_matrix();
-    let key = matrix.locate_header("1").unwrap();
-
-    let actual: Vec<HeaderName<_>> = matrix
-        .iterate_headers(key, |c| c.down, include_start)
-        .map(|h| h.name.clone())
-        .collect();
-
-    let mut exp = vec![];
     if include_start {
         exp.insert(0, O("1".to_string()));
     }
@@ -150,8 +131,8 @@ fn test_cell_iterator_left(include_start: bool) {
     let key = matrix.locate_cell(4, "2").unwrap();
 
     let actual: Vec<_> = matrix
-        .iterate_cells(key, |cell| cell.left, include_start)
-        .map(|h| h.key)
+        .iterate_cells(key, CellIteratorDirection::Left, include_start)
+        .map(|h| unsafe { (*h).key })
         .collect();
 
     let mut exp = vec!["1", "3"];
@@ -163,7 +144,7 @@ fn test_cell_iterator_left(include_start: bool) {
     assert_eq!(
         actual,
         exp.into_iter()
-            .map(|v| matrix.locate_cell(4, v).unwrap())
+            .map(|v| find_cell(&matrix, 4, v).unwrap())
             .collect::<Vec<_>>()
     );
 }
@@ -175,8 +156,8 @@ fn test_cell_iterator_right(include_start: bool) {
     let key = matrix.locate_cell(4, "2").unwrap();
 
     let actual: Vec<_> = matrix
-        .iterate_cells(key, |cell| cell.right, include_start)
-        .map(|h| h.key)
+        .iterate_cells(key, CellIteratorDirection::Right, include_start)
+        .map(|h| unsafe { (*h).key })
         .collect();
 
     let mut exp = vec!["3", "1"];
@@ -188,7 +169,7 @@ fn test_cell_iterator_right(include_start: bool) {
     assert_eq!(
         actual,
         exp.into_iter()
-            .map(|v| matrix.locate_cell(4, v).unwrap())
+            .map(|v| find_cell(&matrix, 4, v).unwrap())
             .collect::<Vec<_>>()
     );
 }
@@ -200,8 +181,8 @@ fn test_cell_iterator_up(include_start: bool) {
     let key = matrix.locate_cell(2, "1").unwrap();
 
     let actual: Vec<_> = matrix
-        .iterate_cells(key, |cell| cell.up, include_start)
-        .map(|h| h.key)
+        .iterate_cells(key, CellIteratorDirection::Up, include_start)
+        .map(|h| unsafe { (*h).key })
         .collect();
 
     let mut exp = vec![1, 0, 4];
@@ -213,7 +194,7 @@ fn test_cell_iterator_up(include_start: bool) {
     assert_eq!(
         actual,
         exp.into_iter()
-            .map(|v| matrix.locate_cell(v, "1").unwrap())
+            .map(|v| find_cell(&matrix, v, "1").unwrap())
             .collect::<Vec<_>>()
     );
 }
@@ -225,8 +206,8 @@ fn test_cell_iterator_down(include_start: bool) {
     let key = matrix.locate_cell(1, "2").unwrap();
 
     let actual: Vec<_> = matrix
-        .iterate_cells(key, |cell| cell.down, include_start)
-        .map(|h| h.key)
+        .iterate_cells(key, CellIteratorDirection::Down, include_start)
+        .map(|h| unsafe { (*h).key })
         .collect();
 
     let mut exp = vec![3, 4, 0];
@@ -238,7 +219,7 @@ fn test_cell_iterator_down(include_start: bool) {
     assert_eq!(
         actual,
         exp.into_iter()
-            .map(|v| matrix.locate_cell(v, "2").unwrap())
+            .map(|v| find_cell(&matrix, v, "2").unwrap())
             .collect::<Vec<_>>()
     );
 }

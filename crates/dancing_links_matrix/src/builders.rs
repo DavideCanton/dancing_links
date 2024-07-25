@@ -10,7 +10,7 @@ use itertools::Itertools;
 
 use crate::{
     cells::{CellRow, HeaderCell, HeaderName, MatrixCell, ProtoCell, ProtoHeaderCell},
-    index::{IndexBuilder, IndexOps, VecIndexBuilder},
+    index::{Index, IndexBuilder, IndexOps, VecIndexBuilder},
     matrix::{ColumnSpec, DancingLinksMatrix},
 };
 
@@ -284,7 +284,7 @@ where
             for c in v {
                 boundaries.push((c.up, c.down, c.left, c.right));
 
-                let h = fh.get_ptr(c.header);
+                let h = unsafe { fh.get_mut_ptr(c.header) };
                 cells.push(MatrixCell::new(c.key, h, c.row));
             }
 
@@ -310,10 +310,10 @@ where
         });
 
         for h in fh.iter_mut() {
-            h.cell = fc.get_ptr(h.cell as usize);
+            h.cell = unsafe { fc.get_mut_ptr(h.cell as usize) };
         }
 
-        let header_key = fh.get_ptr(matrix.header_key);
+        let header_key = unsafe { fh.get_mut_ptr(matrix.header_key) };
 
         DancingLinksMatrix {
             headers: fh,
