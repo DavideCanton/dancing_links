@@ -1,11 +1,3 @@
-//! Allocator for vector backed allocation of types.
-//!
-//! This module provides a trait `Allocator` that defines an interface for
-//! allocating values of type `T` and returning a key of type `K`.
-//!
-//! The `VecAllocator` type implements this trait and uses a `Vec<T>` as the
-//! underlying storage.
-
 use std::cell::UnsafeCell;
 
 pub trait IndexOps<T> {
@@ -23,23 +15,19 @@ pub trait IndexOps<T> {
 pub trait IndexBuilder<T>: IndexOps<T> {
     type Index<U>;
 
-    /// Returns the next key that can be used to allocate a value of type `T`.
-    fn next_key(&self) -> usize;
-
     /// Inserts a value of type `T` into the allocator and returns the key
     /// associated with the value.
-    fn insert(&mut self, val: T) -> usize;
+    fn insert(&mut self, val: T);
 
     fn finalize<U>(self, mapper: impl Fn(Vec<T>) -> Vec<U>) -> Self::Index<U>;
 
-    fn get_mut(&mut self, key: usize) -> &mut T;
+    fn get_mut(&mut self, index: usize) -> &mut T;
 }
 
-/// A trait for allocating values of type `T` and returning a key of type `K`.
 pub trait Index<T>: IndexOps<T> {
-    unsafe fn get_mut_ptr(&self, k: usize) -> *mut T;
+    unsafe fn get_mut_ptr(&self, index: usize) -> *mut T;
 
-    fn get(&self, k: usize) -> &T;
+    fn get(&self, index: usize) -> &T;
 }
 
 pub struct VecIndexBuilder<T> {
@@ -63,13 +51,8 @@ impl<T> VecIndexBuilder<T> {
 impl<T> IndexBuilder<T> for VecIndexBuilder<T> {
     type Index<U> = VecIndex<U>;
 
-    fn next_key(&self) -> usize {
-        self.buffer.len()
-    }
-
-    fn insert(&mut self, val: T) -> usize {
+    fn insert(&mut self, val: T) {
         self.buffer.push(val);
-        self.buffer.len() - 1
     }
 
     fn finalize<U>(self, mapper: impl FnOnce(Vec<T>) -> Vec<U>) -> Self::Index<U> {
@@ -78,8 +61,8 @@ impl<T> IndexBuilder<T> for VecIndexBuilder<T> {
         }
     }
 
-    fn get_mut(&mut self, key: usize) -> &mut T {
-        self.buffer.get_mut(key).unwrap()
+    fn get_mut(&mut self, index: usize) -> &mut T {
+        self.buffer.get_mut(index).unwrap()
     }
 }
 
@@ -110,12 +93,12 @@ impl<T> VecIndex<T> {
 }
 
 impl<T> Index<T> for VecIndex<T> {
-    unsafe fn get_mut_ptr(&self, k: usize) -> *mut T {
-        (*self.buffer.get()).as_mut_ptr().add(k)
+    unsafe fn get_mut_ptr(&self, index: usize) -> *mut T {
+        (*self.buffer.get()).as_mut_ptr().add(index)
     }
 
-    fn get(&self, k: usize) -> &T {
-        unsafe { (*self.buffer.get()).get(k).unwrap() }
+    fn get(&self, index: usize) -> &T {
+        unsafe { (*self.buffer.get()).get(index).unwrap() }
     }
 }
 

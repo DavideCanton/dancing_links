@@ -102,29 +102,28 @@ impl<T: Eq> MatrixColBuilder<T> {
         let headers = VecIndexBuilder::with_capacity(column_names.len() + 1);
 
         let mut matrix = BuildingMatrix {
-            header_key: headers.next_key(),
+            header_key: 0,
             headers,
             cells: VecIndexBuilder::new(),
             rows: 0,
             columns: column_names.len(),
         };
 
-        let (header_key, header_cell_key) = matrix.add_header(HeaderName::First);
-        matrix.header_key = header_key;
+        let first_header_key = matrix.add_header(HeaderName::First);
 
-        let mut prev_cell_key = header_cell_key;
+        let mut prev_cell_key = first_header_key;
 
         for spec in column_names {
             let primary = spec.primary;
-            let (_, cell_key) = matrix.add_header(HeaderName::Other(spec.name));
+            let header_key = matrix.add_header(HeaderName::Other(spec.name));
 
             if primary {
-                matrix.link_right(prev_cell_key, cell_key);
-                prev_cell_key = cell_key;
+                matrix.link_right(prev_cell_key, header_key);
+                prev_cell_key = header_key;
             }
         }
 
-        matrix.link_right(prev_cell_key, header_cell_key);
+        matrix.link_right(prev_cell_key, first_header_key);
 
         MatrixRowBuilder { matrix }
     }
@@ -326,7 +325,7 @@ struct BuildingMatrix<T> {
 
 impl<T> BuildingMatrix<T> {
     fn add_cell(&mut self, header_cell_key: usize, row: CellRow) -> usize {
-        let cell_key = self.cells.next_key();
+        let cell_key = self.cells.len();
         let cell = ProtoCell {
             key: cell_key,
             header: header_cell_key,
@@ -336,14 +335,15 @@ impl<T> BuildingMatrix<T> {
             up: cell_key,
             down: cell_key,
         };
-        let actual_key = self.cells.insert(cell);
-        assert_eq!(actual_key, cell_key);
-        actual_key
+        self.cells.insert(cell);
+        cell_key
     }
 
-    fn add_header(&mut self, name: HeaderName<T>) -> (usize, usize) {
-        let header_key = self.headers.next_key();
+    fn add_header(&mut self, name: HeaderName<T>) -> usize {
+        let header_key = self.headers.len();
         let header_cell_key = self.add_cell(header_key, CellRow::Header);
+
+        assert_eq!(header_key, header_cell_key);
 
         let header = ProtoHeaderCell {
             key: header_key,
@@ -351,10 +351,8 @@ impl<T> BuildingMatrix<T> {
             size: 0,
             cell: header_cell_key,
         };
-        let actual_header_key = self.headers.insert(header);
-        assert_eq!(header_key, actual_header_key);
-
-        (actual_header_key, header_cell_key)
+        self.headers.insert(header);
+        header_key
     }
 
     fn link_right(&mut self, left: usize, right: usize) {
