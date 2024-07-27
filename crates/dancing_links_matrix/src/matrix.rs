@@ -161,8 +161,8 @@ impl<T: Eq> DancingLinksMatrix<T> {
         unsafe {
             self.iterate_headers(self.header_key, HeaderIteratorDirection::Right, true)
                 .find(|h| match (*(*h)).name {
-                    HeaderName::First => false,
                     HeaderName::Other(ref c) => *c.as_ref() == *column,
+                    _ => false,
                 })
         }
     }

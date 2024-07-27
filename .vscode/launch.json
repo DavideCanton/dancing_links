@@ -1,46 +1,61 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "type": "cppvsdbg",
-            "request": "launch",
-            "name": "Debug executable 'sudoku' on windows",
-            "program": "${workspaceRoot}/target/debug/sudoku.exe",
-            "args": [],
-            "cwd": "${workspaceRoot}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug executable 'sudoku' on linux",
-            "program": "${workspaceRoot}/target/debug/sudoku",
-            "args": [],
-            "cwd": "${workspaceRoot}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug executable 'nqueens' on linux",
-            "program": "${workspaceRoot}/target/debug/nqueens",
-            "args": ["4", "0"],
-            "cwd": "${workspaceRoot}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'sudoku'",
-            "cargo": {
-                "args": ["test", "--no-run", "--bin=sudoku"],
-                "filter": {
-                    "name": "sudoku",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "cppvsdbg",
+      "request": "launch",
+      "name": "Debug executable 'sudoku' on windows",
+      "program": "${workspaceRoot}/target/debug/sudoku.exe",
+      "args": [],
+      "cwd": "${workspaceRoot}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'sudoku' on linux",
+      "program": "${workspaceRoot}/target/debug/sudoku",
+      "args": [],
+      "cwd": "${workspaceRoot}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'nqueens' on linux",
+      "program": "${workspaceRoot}/target/debug/nqueens",
+      "args": ["4", "0"],
+      "cwd": "${workspaceRoot}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'sudoku'",
+      "cargo": {
+        "args": ["test", "--no-run", "--bin=sudoku"],
+        "filter": {
+          "name": "sudoku",
+          "kind": "bin"
         }
-    ]
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "test_builder_headers"], // Cargo command line to build the debug target
+        "filter": {
+          "name": "dancing_links_matrix",
+          "kind": "lib",
+
+        }
+      },
+      "args": ["test_locate_header"],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
 }

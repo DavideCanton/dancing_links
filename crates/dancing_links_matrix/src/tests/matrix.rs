@@ -8,6 +8,8 @@ use crate::{
 };
 use HeaderName::{First as F, Other as O};
 
+use super::utils::create_row;
+
 fn find_cell(mat: &DancingLinksMatrix<String>, row: usize, name: &str) -> Option<usize> {
     unsafe { mat.locate_cell(row, name).map(|c| (*c).key) }
 }
@@ -230,13 +232,9 @@ fn build_matrix() -> DancingLinksMatrix<String> {
         .add_column(2.to_string())
         .add_column(3.to_string())
         .end_columns()
-        .add_sorted_row(r(["1", "2"]))
-        .add_sorted_row(r(["1", "3"]))
-        .add_sorted_row(r(["2", "3"]))
-        .add_sorted_row(r(["1", "2", "3"]))
+        .add_sorted_row(create_row(["1", "2"]))
+        .add_sorted_row(create_row(["1", "3"]))
+        .add_sorted_row(create_row(["2", "3"]))
+        .add_sorted_row(create_row(["1", "2", "3"]))
         .build()
-}
-
-fn r<const N: usize>(v: [&str; N]) -> Vec<String> {
-    v.iter().map(|v| v.to_string()).collect()
 }

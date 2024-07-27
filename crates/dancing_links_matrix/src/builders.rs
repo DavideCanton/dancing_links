@@ -4,8 +4,6 @@
 //!
 //! [`DancingLinksMatrix`]: crate::matrix::DancingLinksMatrix
 
-use std::ptr::null_mut;
-
 use itertools::Itertools;
 
 use crate::{
@@ -266,16 +264,9 @@ where
     pub fn build(self) -> DancingLinksMatrix<T> {
         let matrix = self.matrix;
 
-        let mut fh = matrix.headers.finalize(|v| {
-            let mut res = Vec::with_capacity(v.len());
-            for h in v {
-                let mut hc = HeaderCell::new(h.name, h.size);
-                // TODO using the offset as pointer
-                hc.cell = unsafe { null_mut::<MatrixCell<T>>().add(h.cell) };
-                res.push(hc);
-            }
-            res
-        });
+        let mut fh = matrix
+            .headers
+            .finalize(|v| v.into_iter().map(HeaderCell::from_proto).collect());
 
         let fc = matrix.cells.finalize(|v| {
             let mut boundaries = Vec::with_capacity(v.len());

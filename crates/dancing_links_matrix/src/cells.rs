@@ -145,13 +145,20 @@ impl<T> HeaderCell<T> {
     /// * `name` - The name of the header cell.
     /// * `key` - The key of the header cell.
     /// * `cell_key` - The key of the linked cell.
-    pub fn new(name: HeaderName<T>, key: usize) -> HeaderCell<T> {
+    pub fn new(name: HeaderName<T>, key: usize, size: usize) -> HeaderCell<T> {
         HeaderCell {
             key,
             name,
-            size: 0,
+            size,
             cell: null_mut(),
         }
+    }
+
+    pub fn from_proto(proto: ProtoHeaderCell<T>) -> HeaderCell<T> {
+        let mut hc = Self::new(proto.name, proto.key, proto.size);
+        // TODO using the offset as pointer
+        hc.cell = proto.cell as *mut MatrixCell<T>;
+        hc
     }
 
     /// Checks if the header cell is the first header cell.
