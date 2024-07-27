@@ -6,7 +6,7 @@ use std::{
 use log::debug;
 
 use crate::{
-    cells::{CellRow, HeaderCell, HeaderName, MatrixCell},
+    cells::{CellRow, Header, HeaderName, MatrixCell},
     matrix::CellIteratorDirection,
     DancingLinksMatrix,
 };
@@ -67,8 +67,8 @@ impl<T: Eq + Clone> Debug for StackElem<T> {
                     f,
                     "Iteration({:?} {:?} {:?})",
                     k,
-                    (*(*current_row)).key,
-                    (*(*start_row)).key
+                    (*(*current_row)).index,
+                    (*(*start_row)).index
                 )
             },
         }
@@ -131,7 +131,7 @@ impl<T: Eq + Clone> IterativeAlgorithmXSolver<T> {
 
             let k = elem.k();
 
-            let header = self.matrix.header_key;
+            let header = self.matrix.header_index;
             let header_cell = (*header).cell;
 
             if (*header_cell).right == header_cell {
@@ -214,10 +214,10 @@ unsafe fn add_to_sol<T: Eq>(
     sol_dict: &mut HashMap<usize, *mut MatrixCell<T>>,
     k: usize,
     next_row: *mut MatrixCell<T>,
-    current_col: *mut HeaderCell<T>,
+    current_col: *mut Header<T>,
 ) {
     let row = (*next_row).row;
-    let cur = (*current_col).key;
+    let cur = (*current_col).index;
     debug!("inserting cell {next_row:?} of row {row} at {k}, column = {cur}");
 
     if cfg!(debug_assertions) {

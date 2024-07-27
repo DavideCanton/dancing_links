@@ -9,7 +9,7 @@ use itertools::Itertools;
 use rand::{thread_rng, Rng};
 
 use crate::{
-    cells::{CellRow, HeaderCell, HeaderName, MatrixCell},
+    cells::{CellRow, Header, HeaderName, MatrixCell},
     index::{Index, IndexOps, VecIndex},
 };
 
@@ -41,10 +41,10 @@ impl<T> From<T> for ColumnSpec<T> {
 }
 
 pub struct DancingLinksMatrix<T> {
-    pub(crate) header_key: *mut HeaderCell<T>,
+    pub(crate) header_index: *mut Header<T>,
     pub(crate) rows: usize,
     pub(crate) columns: usize,
-    pub(crate) headers: VecIndex<HeaderCell<T>>,
+    pub(crate) headers: VecIndex<Header<T>>,
     pub(crate) cells: VecIndex<MatrixCell<T>>,
 }
 
@@ -57,23 +57,23 @@ impl<T: Eq> DancingLinksMatrix<T> {
         RowIterator::new(self)
     }
 
-    pub(crate) fn min_column(&self) -> Option<*mut HeaderCell<T>> {
-        self.iterate_headers(self.header_key, HeaderIteratorDirection::Right, false)
+    pub(crate) fn min_column(&self) -> Option<*mut Header<T>> {
+        self.iterate_headers(self.header_index, HeaderIteratorDirection::Right, false)
             .min_by_key(|h| unsafe { (*(*h)).size })
     }
 
-    pub(crate) fn random_column(&self) -> Option<*mut HeaderCell<T>> {
+    pub(crate) fn random_column(&self) -> Option<*mut Header<T>> {
         if self.columns == 0 {
             return None;
         }
 
         let num = thread_rng().gen_range(0..self.columns);
 
-        self.iterate_headers(self.header_key, HeaderIteratorDirection::Right, false)
+        self.iterate_headers(self.header_index, HeaderIteratorDirection::Right, false)
             .nth(num)
     }
 
-    pub(crate) fn cover(&mut self, header: *mut HeaderCell<T>) {
+    pub(crate) fn cover(&mut self, header: *mut Header<T>) {
         unsafe {
             let hr = (*(*header).cell).right;
             let hl = (*(*header).cell).left;
@@ -96,7 +96,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
         }
     }
 
-    pub(crate) fn uncover(&mut self, header: *const HeaderCell<T>) {
+    pub(crate) fn uncover(&mut self, header: *const Header<T>) {
         unsafe {
             let v = self
                 .iterate_cells((*header).cell, CellIteratorDirection::Up, false)
@@ -128,10 +128,10 @@ impl<T: Eq> DancingLinksMatrix<T> {
 
     pub(crate) fn iterate_headers(
         &self,
-        start: *mut HeaderCell<T>,
+        start: *mut Header<T>,
         direction: HeaderIteratorDirection,
         include_start: bool,
-    ) -> impl Iterator<Item = *mut HeaderCell<T>> {
+    ) -> impl Iterator<Item = *mut Header<T>> {
         HeaderCellIterator::new(start, direction, include_start)
     }
 
@@ -154,12 +154,12 @@ impl<T: Eq> DancingLinksMatrix<T> {
     }
 
     #[cfg(test)]
-    pub(crate) fn locate_header<C: Eq + ?Sized>(&self, column: &C) -> Option<*mut HeaderCell<T>>
+    pub(crate) fn locate_header<C: Eq + ?Sized>(&self, column: &C) -> Option<*mut Header<T>>
     where
         T: AsRef<C>,
     {
         unsafe {
-            self.iterate_headers(self.header_key, HeaderIteratorDirection::Right, true)
+            self.iterate_headers(self.header_index, HeaderIteratorDirection::Right, true)
                 .find(|h| match (*(*h)).name {
                     HeaderName::Other(ref c) => *c.as_ref() == *column,
                     _ => false,
@@ -204,12 +204,12 @@ impl<T: fmt::Debug + Eq> fmt::Debug for DancingLinksMatrix<T> {
             unsafe {
                 matrix.push_str(&format!(
                     "{:>4} {:>4} {:>4} {:>4} {:>4} {:>4} {:>4}",
-                    cell.key,
-                    (*cell.up).key,
-                    (*cell.down).key,
-                    (*cell.left).key,
-                    (*cell.right).key,
-                    (*cell.header).key,
+                    cell.index,
+                    (*cell.up).index,
+                    (*cell.down).index,
+                    (*cell.left).index,
+                    (*cell.right).index,
+                    (*cell.header).index,
                     cell.row
                 ));
             }
@@ -225,23 +225,23 @@ impl<T: fmt::Display + Eq> fmt::Display for DancingLinksMatrix<T> {
             let mut inds = HashMap::new();
 
             for (i, header) in self
-                .iterate_headers(self.header_key, HeaderIteratorDirection::Right, true)
+                .iterate_headers(self.header_index, HeaderIteratorDirection::Right, true)
                 .enumerate()
             {
                 let ind = i * 5;
-                inds.insert((*header).key, ind);
+                inds.insert((*header).index, ind);
                 rows[0].replace_range(ind..ind + 4, &format!("{:>4}", (*header).name));
             }
 
             for header in
-                self.iterate_headers(self.header_key, HeaderIteratorDirection::Right, true)
+                self.iterate_headers(self.header_index, HeaderIteratorDirection::Right, true)
             {
                 for c in self.iterate_cells((*header).cell, CellIteratorDirection::Down, false) {
                     let header = (*c).header;
-                    let ind = inds[&(*header).key];
+                    let ind = inds[&(*header).index];
 
                     let row: usize = (*c).row.into();
-                    rows[row].replace_range(ind..ind + 4, &format!("{:>4}", (*c).key));
+                    rows[row].replace_range(ind..ind + 4, &format!("{:>4}", (*c).index));
                 }
             }
 
@@ -411,8 +411,8 @@ pub(crate) enum HeaderIteratorDirection {
 }
 
 pub(crate) struct HeaderCellIterator<T> {
-    start: *mut HeaderCell<T>,
-    current: *mut HeaderCell<T>,
+    start: *mut Header<T>,
+    current: *mut Header<T>,
     direction: HeaderIteratorDirection,
     end: bool,
     include_start: bool,
@@ -420,7 +420,7 @@ pub(crate) struct HeaderCellIterator<T> {
 
 impl<T> HeaderCellIterator<T> {
     fn new(
-        start: *mut HeaderCell<T>,
+        start: *mut Header<T>,
         direction: HeaderIteratorDirection,
         include_start: bool,
     ) -> HeaderCellIterator<T> {
@@ -438,7 +438,7 @@ impl<T> Iterator for HeaderCellIterator<T>
 where
     T: Eq,
 {
-    type Item = *mut HeaderCell<T>;
+    type Item = *mut Header<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.end {

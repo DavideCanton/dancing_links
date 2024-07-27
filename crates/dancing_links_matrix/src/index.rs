@@ -1,9 +1,6 @@
 use std::cell::UnsafeCell;
 
 pub trait IndexOps<T> {
-    /// Returns an iterator over the values in the allocator.
-    ///
-    /// The iterator yields `&T`, where `&T` is a reference to the value.
     fn iter<'s>(&'s self) -> impl Iterator<Item = &'s T> + 's
     where
         T: 's;
@@ -15,8 +12,6 @@ pub trait IndexOps<T> {
 pub trait IndexBuilder<T>: IndexOps<T> {
     type Index<U>;
 
-    /// Inserts a value of type `T` into the allocator and returns the key
-    /// associated with the value.
     fn insert(&mut self, val: T);
 
     fn finalize<U>(self, mapper: impl Fn(Vec<T>) -> Vec<U>) -> Self::Index<U>;
@@ -35,12 +30,10 @@ pub struct VecIndexBuilder<T> {
 }
 
 impl<T> VecIndexBuilder<T> {
-    /// Creates a new `VecIndexBuilder`.
     pub(crate) fn new() -> VecIndexBuilder<T> {
         VecIndexBuilder { buffer: Vec::new() }
     }
 
-    /// Creates a new `VecIndexBuilder` with the specified capacity.
     pub(crate) fn with_capacity(len: usize) -> VecIndexBuilder<T> {
         VecIndexBuilder {
             buffer: Vec::with_capacity(len),

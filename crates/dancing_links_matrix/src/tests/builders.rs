@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    cells::{HeaderCell, HeaderName, MatrixCell},
+    cells::{Header, HeaderName, MatrixCell},
     index::{Index, IndexOps, VecIndex},
     DancingLinksMatrix, MatrixBuilder,
 };
@@ -110,7 +110,7 @@ fn index_map<T>(index: &VecIndex<T>) -> HashMap<usize, *mut T> {
 #[allow(clippy::too_many_arguments)]
 fn check_cell(
     cell_map: &HashMap<usize, *mut MatrixCell<String>>,
-    headers_map: &HashMap<usize, *mut HeaderCell<String>>,
+    headers_map: &HashMap<usize, *mut Header<String>>,
     index: usize,
     up: usize,
     down: usize,
@@ -132,7 +132,7 @@ fn check_cell(
 }
 
 fn check_header(
-    headers_map: &HashMap<usize, *mut HeaderCell<String>>,
+    headers_map: &HashMap<usize, *mut Header<String>>,
     cell_map: &HashMap<usize, *mut MatrixCell<String>>,
     index: usize,
     name: HeaderName<String>,

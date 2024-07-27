@@ -11,11 +11,11 @@ use HeaderName::{First as F, Other as O};
 use super::utils::create_row;
 
 fn find_cell(mat: &DancingLinksMatrix<String>, row: usize, name: &str) -> Option<usize> {
-    unsafe { mat.locate_cell(row, name).map(|c| (*c).key) }
+    unsafe { mat.locate_cell(row, name).map(|c| (*c).index) }
 }
 
 fn find_header(mat: &DancingLinksMatrix<String>, name: &str) -> Option<usize> {
-    unsafe { mat.locate_header(name).map(|h| (*h).key) }
+    unsafe { mat.locate_header(name).map(|h| (*h).index) }
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn test_header_cell_iterator_right_from_first(include_start: bool) {
 
     let actual: Vec<HeaderName<_>> = matrix
         .iterate_headers(
-            matrix.header_key,
+            matrix.header_index,
             HeaderIteratorDirection::Right,
             include_start,
         )
@@ -94,10 +94,10 @@ fn test_header_cell_iterator_right_from_first(include_start: bool) {
 #[test_matrix([true, false]; "include_start")]
 fn test_header_cell_iterator_right(include_start: bool) {
     let matrix = build_matrix();
-    let key = matrix.locate_header("1").unwrap();
+    let index = matrix.locate_header("1").unwrap();
 
     let actual: Vec<HeaderName<_>> = matrix
-        .iterate_headers(key, HeaderIteratorDirection::Right, include_start)
+        .iterate_headers(index, HeaderIteratorDirection::Right, include_start)
         .map(|h| unsafe { (*h).name.clone() })
         .collect();
 
@@ -112,10 +112,10 @@ fn test_header_cell_iterator_right(include_start: bool) {
 #[test_matrix([true, false]; "include_start")]
 fn test_header_cell_iterator_left(include_start: bool) {
     let matrix = build_matrix();
-    let key = matrix.locate_header("1").unwrap();
+    let index = matrix.locate_header("1").unwrap();
 
     let actual: Vec<HeaderName<_>> = matrix
-        .iterate_headers(key, HeaderIteratorDirection::Left, include_start)
+        .iterate_headers(index, HeaderIteratorDirection::Left, include_start)
         .map(|h| unsafe { (*h).name.clone() })
         .collect();
     let mut exp = vec![F, O("3".to_string()), O("2".to_string())];
@@ -130,11 +130,11 @@ fn test_header_cell_iterator_left(include_start: bool) {
 fn test_cell_iterator_left(include_start: bool) {
     let matrix = build_matrix();
 
-    let key = matrix.locate_cell(4, "2").unwrap();
+    let index = matrix.locate_cell(4, "2").unwrap();
 
     let actual: Vec<_> = matrix
-        .iterate_cells(key, CellIteratorDirection::Left, include_start)
-        .map(|h| unsafe { (*h).key })
+        .iterate_cells(index, CellIteratorDirection::Left, include_start)
+        .map(|h| unsafe { (*h).index })
         .collect();
 
     let mut exp = vec!["1", "3"];
@@ -155,11 +155,11 @@ fn test_cell_iterator_left(include_start: bool) {
 fn test_cell_iterator_right(include_start: bool) {
     let matrix = build_matrix();
 
-    let key = matrix.locate_cell(4, "2").unwrap();
+    let index = matrix.locate_cell(4, "2").unwrap();
 
     let actual: Vec<_> = matrix
-        .iterate_cells(key, CellIteratorDirection::Right, include_start)
-        .map(|h| unsafe { (*h).key })
+        .iterate_cells(index, CellIteratorDirection::Right, include_start)
+        .map(|h| unsafe { (*h).index })
         .collect();
 
     let mut exp = vec!["3", "1"];
@@ -180,11 +180,11 @@ fn test_cell_iterator_right(include_start: bool) {
 fn test_cell_iterator_up(include_start: bool) {
     let matrix = build_matrix();
 
-    let key = matrix.locate_cell(2, "1").unwrap();
+    let index = matrix.locate_cell(2, "1").unwrap();
 
     let actual: Vec<_> = matrix
-        .iterate_cells(key, CellIteratorDirection::Up, include_start)
-        .map(|h| unsafe { (*h).key })
+        .iterate_cells(index, CellIteratorDirection::Up, include_start)
+        .map(|h| unsafe { (*h).index })
         .collect();
 
     let mut exp = vec![1, 0, 4];
@@ -205,11 +205,11 @@ fn test_cell_iterator_up(include_start: bool) {
 fn test_cell_iterator_down(include_start: bool) {
     let matrix = build_matrix();
 
-    let key = matrix.locate_cell(1, "2").unwrap();
+    let index = matrix.locate_cell(1, "2").unwrap();
 
     let actual: Vec<_> = matrix
-        .iterate_cells(key, CellIteratorDirection::Down, include_start)
-        .map(|h| unsafe { (*h).key })
+        .iterate_cells(index, CellIteratorDirection::Down, include_start)
+        .map(|h| unsafe { (*h).index })
         .collect();
 
     let mut exp = vec![3, 4, 0];

@@ -130,12 +130,12 @@ fn build_matrix(
         match known.get(&(i, j)) {
             Some(v) => {
                 let row = compute_row(i, j, *v);
-                matrix_builder = matrix_builder.add_sorted_row_key(row);
+                matrix_builder = matrix_builder.add_sorted_row_index(row);
             }
             None => {
                 for v in 1..=9 {
                     let row = compute_row(i, j, v);
-                    matrix_builder = matrix_builder.add_sorted_row_key(row);
+                    matrix_builder = matrix_builder.add_sorted_row_index(row);
                 }
             }
         }

@@ -42,7 +42,7 @@ fn build_matrix(n: usize) -> DancingLinksMatrix<String> {
 
     for (i, j) in (0..n).cartesian_product(0..n) {
         let row = compute_row(i, j, n);
-        matrix_builder = matrix_builder.add_sorted_row_key(row);
+        matrix_builder = matrix_builder.add_sorted_row_index(row);
     }
 
     matrix_builder.build()
