@@ -76,7 +76,7 @@ fn test_header_cell_iterator_right_from_first(include_start: bool) {
 
     let actual: Vec<HeaderName<_>> = matrix
         .iterate_headers(
-            matrix.header_index,
+            matrix.first_header(),
             HeaderIteratorDirection::Right,
             include_start,
         )

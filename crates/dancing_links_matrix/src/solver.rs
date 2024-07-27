@@ -131,7 +131,7 @@ impl<T: Eq + Clone> IterativeAlgorithmXSolver<T> {
 
             let k = elem.k();
 
-            let header = self.matrix.header_index;
+            let header = self.matrix.first_header();
             let header_cell = (*header).cell;
 
             if (*header_cell).right == header_cell {

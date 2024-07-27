@@ -41,7 +41,6 @@ impl<T> From<T> for ColumnSpec<T> {
 }
 
 pub struct DancingLinksMatrix<T> {
-    pub(crate) header_index: *mut Header<T>,
     pub(crate) rows: usize,
     pub(crate) columns: usize,
     pub(crate) headers: VecIndex<Header<T>>,
@@ -49,6 +48,10 @@ pub struct DancingLinksMatrix<T> {
 }
 
 impl<T: Eq> DancingLinksMatrix<T> {
+    pub(crate) fn first_header(&self) -> *mut Header<T> {
+        unsafe { self.headers.get_mut_ptr(0) }
+    }
+
     pub fn iter_rows<Ret>(&self) -> RowIterator<T, Ret>
     where
         T: AsRef<Ret>,
@@ -58,7 +61,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
     }
 
     pub(crate) fn min_column(&self) -> Option<*mut Header<T>> {
-        self.iterate_headers(self.header_index, HeaderIteratorDirection::Right, false)
+        self.iterate_headers(self.first_header(), HeaderIteratorDirection::Right, false)
             .min_by_key(|h| unsafe { (*(*h)).size })
     }
 
@@ -69,7 +72,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
 
         let num = thread_rng().gen_range(0..self.columns);
 
-        self.iterate_headers(self.header_index, HeaderIteratorDirection::Right, false)
+        self.iterate_headers(self.first_header(), HeaderIteratorDirection::Right, false)
             .nth(num)
     }
 
@@ -159,7 +162,7 @@ impl<T: Eq> DancingLinksMatrix<T> {
         T: AsRef<C>,
     {
         unsafe {
-            self.iterate_headers(self.header_index, HeaderIteratorDirection::Right, true)
+            self.iterate_headers(self.first_header(), HeaderIteratorDirection::Right, true)
                 .find(|h| match (*(*h)).name {
                     HeaderName::Other(ref c) => *c.as_ref() == *column,
                     _ => false,
@@ -225,7 +228,7 @@ impl<T: fmt::Display + Eq> fmt::Display for DancingLinksMatrix<T> {
             let mut inds = HashMap::new();
 
             for (i, header) in self
-                .iterate_headers(self.header_index, HeaderIteratorDirection::Right, true)
+                .iterate_headers(self.first_header(), HeaderIteratorDirection::Right, true)
                 .enumerate()
             {
                 let ind = i * 5;
@@ -234,7 +237,7 @@ impl<T: fmt::Display + Eq> fmt::Display for DancingLinksMatrix<T> {
             }
 
             for header in
-                self.iterate_headers(self.header_index, HeaderIteratorDirection::Right, true)
+                self.iterate_headers(self.first_header(), HeaderIteratorDirection::Right, true)
             {
                 for c in self.iterate_cells((*header).cell, CellIteratorDirection::Down, false) {
                     let header = (*c).header;

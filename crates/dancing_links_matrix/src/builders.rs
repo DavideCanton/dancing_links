@@ -102,7 +102,6 @@ impl<T: Eq> MatrixColBuilder<T> {
         let headers = VecIndexBuilder::with_capacity(column_names.len() + 1);
 
         let mut matrix = BuildingMatrix {
-            header_index: 0,
             headers,
             cells: VecIndexBuilder::new(),
             rows: 0,
@@ -282,20 +281,16 @@ where
             header.update_pointer(unsafe { cells_index.get_mut_ptr(header.index) });
         }
 
-        let header_index = unsafe { headers_index.get_mut_ptr(matrix.header_index) };
-
         DancingLinksMatrix {
             headers: headers_index,
             cells: cells_index,
             rows: matrix.rows,
             columns: matrix.columns,
-            header_index,
         }
     }
 }
 
 struct BuildingMatrix<T> {
-    pub(crate) header_index: usize,
     pub(crate) headers: VecIndexBuilder<ProtoHeader<T>>,
     pub(crate) cells: VecIndexBuilder<ProtoCell>,
     pub(crate) rows: usize,
