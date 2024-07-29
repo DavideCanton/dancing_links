@@ -6,10 +6,11 @@ use std::{
     str::FromStr,
 };
 
+use bumpalo::Bump;
 use clap::Parser;
-use cmd_common::{init_log, CommonArgs};
+use cmd_common::{init_log, BumpArena, CommonArgs};
 use dancing_links_matrix::{
-    DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder, Solution,
+    Arena, DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder, Solution,
 };
 use itertools::Itertools;
 use logging_timer::time;
@@ -106,8 +107,7 @@ fn print_sol(sol: &Solution<String>) {
 }
 
 #[time]
-fn solve_it(matrix: DancingLinksMatrix<String>) {
-    let mut solver = IterativeAlgorithmXSolver::new(matrix, true, true);
+fn solve_it<'a>(solver: &'a IterativeAlgorithmXSolver<'a, String>) {
     let solutions = solver.solve();
 
     match solutions.into_iter().next() {
@@ -121,9 +121,10 @@ fn solve_it(matrix: DancingLinksMatrix<String>) {
 }
 
 #[time]
-fn build_matrix(
+fn build_matrix<'a>(
     known: HashMap<(usize, usize), usize>,
-) -> dancing_links_matrix::DancingLinksMatrix<String> {
+    arena: &'a impl Arena,
+) -> DancingLinksMatrix<'a, String> {
     let mut matrix_builder = MatrixBuilder::from_iterable(names());
 
     for (i, j) in prod() {
@@ -141,7 +142,7 @@ fn build_matrix(
         }
     }
 
-    matrix_builder.build()
+    matrix_builder.build(arena)
 }
 
 fn load_board(path: &Path) -> HashMap<(usize, usize), usize> {
@@ -190,8 +191,10 @@ fn main() {
         panic!("Not a file");
     }
 
+    let arena: BumpArena = Bump::new().into();
     let known = load_board(&path);
-    let matrix = build_matrix(known);
+    let matrix = build_matrix(known, &arena);
+    let solver = IterativeAlgorithmXSolver::new(matrix, true, true);
 
-    solve_it(matrix);
+    solve_it(&solver);
 }

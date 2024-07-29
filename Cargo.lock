@@ -52,6 +52,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bumpalo"
+version = "3.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -101,7 +107,9 @@ checksum = "4b82cf0babdbd58558212896d1a4272303a57bdb245c2bf1147185fb45640e70"
 name = "cmd_common"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "clap",
+ "dancing_links_matrix",
  "log",
  "simple_logger",
 ]
@@ -126,6 +134,7 @@ dependencies = [
 name = "dancing_links_matrix"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "itertools",
  "log",
  "rand",
@@ -229,6 +238,7 @@ dependencies = [
 name = "nqueens"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "clap",
  "cmd_common",
  "dancing_links_matrix",
@@ -353,6 +363,7 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 name = "sudoku"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "clap",
  "cmd_common",
  "dancing_links_matrix",

@@ -1,6 +1,10 @@
 use clap::Parser;
 use log::Level;
 
+mod impls;
+
+pub use impls::BumpArena;
+
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct CommonArgs {

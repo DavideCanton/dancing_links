@@ -1,9 +1,10 @@
+mod arena;
 mod builders;
 mod cells;
-mod index;
 mod matrix;
 mod solver;
 
+pub use arena::Arena;
 pub use builders::MatrixBuilder;
 pub use matrix::{ColumnSpec, DancingLinksMatrix};
 pub use solver::{IterativeAlgorithmXSolver, Solution};

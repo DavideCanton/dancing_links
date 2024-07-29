@@ -9,3 +9,4 @@ cmd_common = { path = "../cmd_common" }
 itertools.workspace = true
 logging_timer.workspace = true
 clap.workspace = true
+bumpalo.workspace = true

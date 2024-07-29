@@ -1,8 +1,9 @@
 //! The module contains the implementation of the cell and headers.
 
 use std::{
+    cell::Cell,
     fmt::{self, Display},
-    ptr::null_mut,
+    num::NonZero,
 };
 
 /// The row of the cell.
@@ -11,7 +12,7 @@ pub(crate) enum CellRow {
     /// The row is the header row.
     Header,
     /// The row is a data row.
-    Data(usize),
+    Data(NonZero<usize>),
 }
 
 impl From<usize> for CellRow {
@@ -19,7 +20,7 @@ impl From<usize> for CellRow {
     fn from(name: usize) -> Self {
         match name {
             0 => CellRow::Header,
-            name => CellRow::Data(name),
+            name => CellRow::Data(unsafe { NonZero::new_unchecked(name) }),
         }
     }
 }
@@ -29,7 +30,7 @@ impl From<CellRow> for usize {
     fn from(row: CellRow) -> Self {
         match row {
             CellRow::Header => panic!("Cannot convert Header to usize"),
-            CellRow::Data(name) => name,
+            CellRow::Data(name) => name.into(),
         }
     }
 }
@@ -80,26 +81,32 @@ impl ProtoCell {
     }
 }
 
+pub type MatrixCellRef<'a, T> = &'a MatrixCell<'a, T>;
+pub type MatrixCellPtr<'a, T> = Cell<Option<MatrixCellRef<'a, T>>>;
+
+pub type HeaderRef<'a, T> = &'a Header<'a, T>;
+pub type HeaderPtr<'a, T> = Cell<Option<HeaderRef<'a, T>>>;
+
 /// The cell of the matrix.
 #[derive(Debug)]
-pub(crate) struct MatrixCell<T> {
+pub(crate) struct MatrixCell<'a, T> {
     /// The index of the cell.
     pub(crate) index: usize,
     /// Pointer to the cell above the current cell.
-    pub(crate) up: *mut MatrixCell<T>,
+    pub(crate) up: MatrixCellPtr<'a, T>,
     /// Pointer to the cell below the current cell.
-    pub(crate) down: *mut MatrixCell<T>,
+    pub(crate) down: MatrixCellPtr<'a, T>,
     /// Pointer to the cell to the left of the current cell.
-    pub(crate) left: *mut MatrixCell<T>,
+    pub(crate) left: MatrixCellPtr<'a, T>,
     /// Pointer to the cell to the right of the current cell.
-    pub(crate) right: *mut MatrixCell<T>,
+    pub(crate) right: MatrixCellPtr<'a, T>,
     /// Pointer to the header.
-    pub(crate) header: *mut Header<T>,
+    pub(crate) header: HeaderPtr<'a, T>,
     /// The row of the cell.
     pub(crate) row: CellRow,
 }
 
-impl<T> MatrixCell<T> {
+impl<'a, T> MatrixCell<'a, T> {
     /// Creates a new cell.
     ///
     /// All its links are set to `null_mut()`.
@@ -109,54 +116,15 @@ impl<T> MatrixCell<T> {
     /// * `index` - The index of the cell.
     /// * `header` - A pointer to the header.
     /// * `row` - The row of the cell.
-    pub fn new(index: usize, header: *mut Header<T>, row: CellRow) -> MatrixCell<T> {
+    pub fn new(index: usize, row: CellRow) -> MatrixCell<'a, T> {
         MatrixCell {
             index,
-            up: null_mut(),
-            down: null_mut(),
-            left: null_mut(),
-            right: null_mut(),
-            header,
+            up: Cell::new(None),
+            down: Cell::new(None),
+            left: Cell::new(None),
+            right: Cell::new(None),
+            header: Cell::new(None),
             row,
-        }
-    }
-
-    /// Updates the pointers of the cell.
-    ///
-    /// Uses the provided `base` as the base address, and the indexes of the cells above, below, left and right
-    /// as offsets from `base`.
-    ///
-    /// This implies that the cells are stored contiguously in memory.
-    ///
-    /// # Arguments
-    ///
-    /// * `base` - A pointer to use as the base when adding the offsets.
-    /// * `up` - The index of the cell above the current cell.
-    /// * `down` - The index of the cell below the current cell.
-    /// * `left` - The index of the cell to the left of the current cell.
-    /// * `right` - The index of the cell to the right of the current cell.
-    pub(crate) fn update_pointers(
-        &mut self,
-        base: *mut MatrixCell<T>,
-        up: usize,
-        down: usize,
-        left: usize,
-        right: usize,
-    ) where
-        T: Eq,
-    {
-        unsafe {
-            let addr = base.add(up);
-            self.up = addr;
-
-            let addr = base.add(down);
-            self.down = addr;
-
-            let addr = base.add(left);
-            self.left = addr;
-
-            let addr = base.add(right);
-            self.right = addr;
         }
     }
 }
@@ -204,18 +172,18 @@ impl<T> ProtoHeader<T> {
 ///
 /// Contains a pointer to a physical cell linked to the header.
 #[derive(Debug)]
-pub(crate) struct Header<T> {
+pub(crate) struct Header<'a, T> {
     /// The index of the header.
     pub(crate) index: usize,
     /// The name of the header.
     pub(crate) name: HeaderName<T>,
     /// The size of the header.
-    pub(crate) size: usize,
+    pub(crate) size: Cell<usize>,
     /// Pointer to the cell.
-    pub(crate) cell: *mut MatrixCell<T>,
+    pub(crate) cell: MatrixCellPtr<'a, T>,
 }
 
-impl<T> Header<T> {
+impl<'a, T> Header<'a, T> {
     /// Creates a new header.
     ///
     /// The `cell` field is left to null.
@@ -225,12 +193,12 @@ impl<T> Header<T> {
     /// * `name` - The name of the header.
     /// * `index` - The index of the header.
     /// * `size` - The size of the header.
-    pub fn new(name: HeaderName<T>, index: usize, size: usize) -> Header<T> {
+    pub fn new(name: HeaderName<T>, index: usize, size: usize) -> Header<'a, T> {
         Header {
             index,
             name,
-            size,
-            cell: null_mut(),
+            size: Cell::new(size),
+            cell: Cell::new(None),
         }
     }
 
@@ -241,12 +209,8 @@ impl<T> Header<T> {
     /// # Arguments
     ///
     /// * `proto` - The prototype of the header.
-    pub fn from_proto(proto: ProtoHeader<T>) -> Header<T> {
+    pub fn from_proto(proto: ProtoHeader<T>) -> Header<'a, T> {
         Self::new(proto.name, proto.index, proto.size)
-    }
-
-    pub fn update_pointer(&mut self, cell: *mut MatrixCell<T>) {
-        self.cell = cell
     }
 
     /// Checks if the header is the first header.

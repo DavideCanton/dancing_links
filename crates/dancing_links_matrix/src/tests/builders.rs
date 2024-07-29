@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
+use bumpalo::Bump;
+
 use crate::{
-    cells::{Header, HeaderName, MatrixCell},
-    index::{Index, IndexOps, VecIndex},
-    DancingLinksMatrix, MatrixBuilder,
+    cells::{HeaderName, HeaderRef, MatrixCellRef},
+    tests::utils::BumpArena,
+    Arena, DancingLinksMatrix, MatrixBuilder,
 };
 
 use super::utils::create_row;
@@ -17,7 +19,7 @@ use super::utils::create_row;
 /// |     |     | 8   | 9   |
 /// |     | 10  | 11  | 12  |
 /// ```
-fn build_matrix() -> DancingLinksMatrix<String> {
+fn build_matrix<'a>(arena: &'a impl Arena) -> DancingLinksMatrix<'a, String> {
     MatrixBuilder
         .add_column(1.to_string())
         .add_column(2.to_string())
@@ -27,12 +29,13 @@ fn build_matrix() -> DancingLinksMatrix<String> {
         .add_sorted_row(create_row(["1", "3"]))
         .add_sorted_row(create_row(["2", "3"]))
         .add_sorted_row(create_row(["1", "2", "3"]))
-        .build()
+        .build(arena)
 }
 
 #[test]
 fn test_builder_headers() {
-    let matrix = build_matrix();
+    let arena: BumpArena = Bump::new().into();
+    let matrix = build_matrix(&arena);
 
     assert_eq!(matrix.rows, 4);
     assert_eq!(matrix.columns, 3);
@@ -66,7 +69,8 @@ fn test_builder_headers() {
 
 #[test]
 fn test_builder_cells() {
-    let matrix = build_matrix();
+    let arena: BumpArena = Bump::new().into();
+    let matrix = build_matrix(&arena);
 
     assert_eq!(matrix.rows, 4);
     assert_eq!(matrix.columns, 3);
@@ -96,21 +100,19 @@ fn test_builder_cells() {
     check_cell(&cell_map, &headers_map, 12, 9, 3, 11, 10, 3);
 }
 
-fn index_map<T>(index: &VecIndex<T>) -> HashMap<usize, *mut T> {
+fn index_map<'a, T>(index: &[&'a T]) -> HashMap<usize, &'a T> {
     let mut map = HashMap::new();
-    unsafe {
-        for i in 0..index.len() {
-            let ptr = index.get_mut_ptr(i);
-            map.insert(i, ptr);
-        }
+    for i in 0..index.len() {
+        let ptr = index[i];
+        map.insert(i, ptr);
     }
     map
 }
 
 #[allow(clippy::too_many_arguments)]
-fn check_cell(
-    cell_map: &HashMap<usize, *mut MatrixCell<String>>,
-    headers_map: &HashMap<usize, *mut Header<String>>,
+fn check_cell<'a>(
+    cell_map: &HashMap<usize, MatrixCellRef<'a, String>>,
+    headers_map: &HashMap<usize, HeaderRef<'a, String>>,
     index: usize,
     up: usize,
     down: usize,
@@ -118,22 +120,35 @@ fn check_cell(
     right: usize,
     header: usize,
 ) {
-    let cell = *cell_map
+    let cell = cell_map
         .get(&index)
         .unwrap_or_else(|| panic!("Cannot find cell with index {index}"));
 
-    unsafe {
-        assert_eq!((*cell).up, *cell_map.get(&up).unwrap());
-        assert_eq!((*cell).down, *cell_map.get(&down).unwrap());
-        assert_eq!((*cell).left, *cell_map.get(&left).unwrap());
-        assert_eq!((*cell).right, *cell_map.get(&right).unwrap());
-        assert_eq!((*cell).header, *headers_map.get(&header).unwrap());
-    }
+    assert_eq!(
+        cell.up.get().unwrap().index,
+        cell_map.get(&up).unwrap().index
+    );
+    assert_eq!(
+        cell.down.get().unwrap().index,
+        cell_map.get(&down).unwrap().index
+    );
+    assert_eq!(
+        cell.left.get().unwrap().index,
+        cell_map.get(&left).unwrap().index
+    );
+    assert_eq!(
+        cell.right.get().unwrap().index,
+        cell_map.get(&right).unwrap().index
+    );
+    assert_eq!(
+        cell.header.get().unwrap().index,
+        headers_map.get(&header).unwrap().index
+    );
 }
 
-fn check_header(
-    headers_map: &HashMap<usize, *mut Header<String>>,
-    cell_map: &HashMap<usize, *mut MatrixCell<String>>,
+fn check_header<'a>(
+    headers_map: &HashMap<usize, HeaderRef<'a, String>>,
+    cell_map: &HashMap<usize, MatrixCellRef<'a, String>>,
     index: usize,
     name: HeaderName<String>,
 ) {
@@ -141,16 +156,12 @@ fn check_header(
         .get(&index)
         .unwrap_or_else(|| panic!("Cannot find header with index {index}"));
 
-    unsafe {
-        assert_eq!((*header).name, name);
-    }
+    assert_eq!(header.name, name);
 
     let cell = *cell_map
         .get(&index)
         .unwrap_or_else(|| panic!("Cannot find cell with index {index}"));
 
-    unsafe {
-        assert_eq!((*cell).header, header);
-        assert_eq!((*header).cell, cell);
-    }
+    assert_eq!(cell.header.get().unwrap().index, header.index);
+    assert_eq!(header.cell.get().unwrap().index, cell.index);
 }
