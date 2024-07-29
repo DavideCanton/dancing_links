@@ -7,6 +7,7 @@ edition = "2021"
 rand = "0.8.5"
 itertools.workspace = true
 log.workspace = true
+concat-idents = "1.1.5"
 
 [dev-dependencies]
 test-case = "3.3.1"

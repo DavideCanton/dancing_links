@@ -17,15 +17,13 @@ pub struct Solution<T> {
 
 fn cover_row<'a, T: Eq>(matrix: &'a DancingLinksMatrix<'a, T>, row: MatrixCellRef<'a, T>) {
     for j in matrix.iterate_cells(row, CellIteratorDirection::Right, false) {
-        let j = j.header.get().unwrap();
-        matrix.cover(j)
+        matrix.cover(j.header())
     }
 }
 
 fn uncover_row<'a, T: Eq>(matrix: &'a DancingLinksMatrix<'a, T>, row: MatrixCellRef<'a, T>) {
     for j in matrix.iterate_cells(row, CellIteratorDirection::Left, false) {
-        let j = j.header.get().unwrap();
-        matrix.uncover(j)
+        matrix.uncover(j.header())
     }
 }
 
@@ -93,7 +91,7 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
                 .matrix
                 .iterate_cells(*row, CellIteratorDirection::Right, true)
             {
-                if let HeaderName::Other(ref name) = &r.header.get().unwrap().name {
+                if let HeaderName::Other(ref name) = r.name() {
                     tmp_list.push(name.clone());
                 }
             }
@@ -122,9 +120,9 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
             let k = elem.k();
 
             let header = self.matrix.first_header();
-            let header_cell = header.cell.get().unwrap();
+            let header_cell = header.cell();
 
-            if header_cell.right.get().unwrap().index == header_cell.index {
+            if header_cell.right().index == header_cell.index {
                 let sol = self.create_sol(k, &sol_dict);
                 solutions.push(sol);
                 if self.return_first {
@@ -147,9 +145,9 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
 
                     uncover_row(&self.matrix, current_row);
 
-                    let next_row = current_row.down.get().unwrap();
+                    let next_row = current_row.down();
                     if next_row.index == start_row.index {
-                        let col = next_row.header.get().unwrap();
+                        let col = next_row.header();
                         self.matrix.uncover(col);
                         advance = true;
                         continue;
@@ -159,7 +157,7 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
                             current_row: next_row,
                             start_row,
                         });
-                        let col = start_row.header.get().unwrap();
+                        let col = start_row.header();
                         add_to_sol(&mut sol_dict, k - 1, next_row, col);
                         advance = false;
                     }
@@ -171,16 +169,16 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
                     } else {
                         self.matrix.random_column().unwrap()
                     };
-                    if start_col.size.get() == 0 {
+                    if start_col.size() == 0 {
                         advance = true;
                         continue;
                     }
 
-                    let col_cell = start_col.cell.get().unwrap();
+                    let col_cell = start_col.cell();
 
                     self.matrix.cover(start_col);
 
-                    let next_row = col_cell.down.get().unwrap();
+                    let next_row = col_cell.down();
                     stack.push(Iteration {
                         k: k + 1,
                         current_row: next_row,
@@ -214,8 +212,7 @@ fn add_to_sol<'a, T: Eq>(
     );
 
     if cfg!(debug_assertions) {
-        let h = next_row.header.get().unwrap();
-        debug_assert!(h.cell.get().unwrap().index != next_row.index);
+        debug_assert!(next_row.header().cell().index != next_row.index);
     }
 
     sol_dict.insert(k, next_row);

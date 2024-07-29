@@ -4,14 +4,12 @@
 //!
 //! [`DancingLinksMatrix`]: crate::matrix::DancingLinksMatrix
 
-use std::marker::PhantomData;
-
 use itertools::Itertools;
 
 use crate::{
+    arena::Arena,
     cells::{CellRow, Header, HeaderName, MatrixCell, ProtoCell, ProtoHeader},
     matrix::{ColumnSpec, DancingLinksMatrix},
-    Arena,
 };
 
 /// A builder for a [`DancingLinksMatrix`].
@@ -106,7 +104,6 @@ impl<T: Eq> MatrixColBuilder<T> {
             columns: column_names.len(),
             headers: Vec::new(),
             cells: Vec::new(),
-            _p: PhantomData,
         };
 
         let first_header_index = matrix.add_header(HeaderName::First);
@@ -239,8 +236,8 @@ where
                 }
             }
 
-            mx.header_mut(header_idx).size += 1;
-            let last = mx.cell_mut(header_idx).up;
+            mx.headers[header_idx].size += 1;
+            let last = mx.cells[header_idx].up;
 
             mx.link_down(in_cell_index, header_idx);
             mx.link_down(last, in_cell_index);
@@ -254,44 +251,34 @@ where
         self
     }
 
-    pub fn build<'a>(self, bump: &'a impl Arena) -> DancingLinksMatrix<'a, T> {
+    pub fn build(self, bump: &impl Arena) -> DancingLinksMatrix<'_, T> {
         let matrix = self.matrix;
 
         let mut headers = Vec::new();
         let mut cells = Vec::new();
 
         for header in matrix.headers {
-            let header = &*bump.alloc(Header::from_proto(header));
+            let header = bump.alloc(Header::from_proto(header));
             headers.push(header);
         }
 
         for cell in matrix.cells.iter() {
-            let cell = &*bump.alloc(MatrixCell::new(cell.index, cell.row));
+            let cell = bump.alloc(MatrixCell::new(cell.index, cell.row));
             cells.push(cell);
         }
 
         for h in headers.iter_mut() {
-            let cell = cells[h.index];
-            h.cell.set(Some(cell));
+            h.update_pointer(cells[h.index]);
         }
 
         for pc in matrix.cells {
-            let cur = cells[pc.index];
-
-            let up = cells[pc.up];
-            cur.up.set(Some(up));
-
-            let down = cells[pc.down];
-            cur.down.set(Some(down));
-
-            let left = cells[pc.left];
-            cur.left.set(Some(left));
-
-            let right = cells[pc.right];
-            cur.right.set(Some(right));
-
-            let header = headers[pc.header];
-            cur.header.set(Some(header));
+            cells[pc.index].update_pointers(
+                cells[pc.up],
+                cells[pc.down],
+                cells[pc.left],
+                cells[pc.right],
+                headers[pc.header],
+            );
         }
 
         DancingLinksMatrix {
@@ -308,7 +295,6 @@ struct BuildingMatrix<T> {
     pub(crate) columns: usize,
     pub(crate) headers: Vec<ProtoHeader<T>>,
     pub(crate) cells: Vec<ProtoCell>,
-    _p: PhantomData<T>,
 }
 
 impl<T> BuildingMatrix<T> {
@@ -338,13 +324,5 @@ impl<T> BuildingMatrix<T> {
     fn link_down(&mut self, up: usize, down: usize) {
         self.cells[up].down = down;
         self.cells[down].up = up;
-    }
-
-    fn header_mut(&mut self, header_idx: usize) -> &mut ProtoHeader<T> {
-        &mut self.headers[header_idx]
-    }
-
-    fn cell_mut(&mut self, cell_idx: usize) -> &mut ProtoCell {
-        &mut self.cells[cell_idx]
     }
 }

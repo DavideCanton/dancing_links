@@ -124,26 +124,11 @@ fn check_cell<'a>(
         .get(&index)
         .unwrap_or_else(|| panic!("Cannot find cell with index {index}"));
 
-    assert_eq!(
-        cell.up.get().unwrap().index,
-        cell_map.get(&up).unwrap().index
-    );
-    assert_eq!(
-        cell.down.get().unwrap().index,
-        cell_map.get(&down).unwrap().index
-    );
-    assert_eq!(
-        cell.left.get().unwrap().index,
-        cell_map.get(&left).unwrap().index
-    );
-    assert_eq!(
-        cell.right.get().unwrap().index,
-        cell_map.get(&right).unwrap().index
-    );
-    assert_eq!(
-        cell.header.get().unwrap().index,
-        headers_map.get(&header).unwrap().index
-    );
+    assert_eq!(cell.up().index, cell_map.get(&up).unwrap().index);
+    assert_eq!(cell.down().index, cell_map.get(&down).unwrap().index);
+    assert_eq!(cell.left().index, cell_map.get(&left).unwrap().index);
+    assert_eq!(cell.right().index, cell_map.get(&right).unwrap().index);
+    assert_eq!(cell.header().index, headers_map.get(&header).unwrap().index);
 }
 
 fn check_header<'a>(
@@ -162,6 +147,6 @@ fn check_header<'a>(
         .get(&index)
         .unwrap_or_else(|| panic!("Cannot find cell with index {index}"));
 
-    assert_eq!(cell.header.get().unwrap().index, header.index);
-    assert_eq!(header.cell.get().unwrap().index, cell.index);
+    assert_eq!(cell.header().index, header.index);
+    assert_eq!(header.cell().index, cell.index);
 }

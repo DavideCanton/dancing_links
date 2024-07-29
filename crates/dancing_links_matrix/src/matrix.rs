@@ -53,7 +53,7 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
 
     pub(crate) fn min_column(&'a self) -> Option<HeaderRef<'a, T>> {
         self.iterate_headers(self.first_header(), HeaderIteratorDirection::Right, false)
-            .min_by_key(|h| h.size.get())
+            .min_by_key(|h| h.size())
     }
 
     pub(crate) fn random_column(&'a self) -> Option<HeaderRef<'a, T>> {
@@ -68,40 +68,28 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
     }
 
     pub(crate) fn cover(&'a self, header: HeaderRef<'a, T>) {
-        let hc = header.cell.get().unwrap();
+        let hc = header.cell();
+        hc.skip_lr();
 
-        hc.right.get().unwrap().left.set(hc.left.get());
-        hc.left.get().unwrap().right.set(hc.right.get());
-
-        let v = self
-            .iterate_cells(hc, CellIteratorDirection::Down, false)
-            .flat_map(|i| self.iterate_cells(i, CellIteratorDirection::Right, false));
-
-        for j in v {
-            j.down.get().unwrap().up.set(j.up.get());
-            j.up.get().unwrap().down.set(j.down.get());
-
-            let jh = j.header.get().unwrap();
-            jh.size.set(jh.size.get() - 1);
+        for i in self.iterate_cells(hc, CellIteratorDirection::Down, false) {
+            for j in self.iterate_cells(i, CellIteratorDirection::Right, false) {
+                j.skip_ud();
+                j.header().decrease_size();
+            }
         }
     }
 
     pub(crate) fn uncover(&'a self, header: HeaderRef<'a, T>) {
-        let hc = header.cell.get().unwrap();
-        let v = self
-            .iterate_cells(hc, CellIteratorDirection::Up, false)
-            .flat_map(|j| self.iterate_cells(j, CellIteratorDirection::Left, false));
+        let hc = header.cell();
 
-        for j in v {
-            j.down.get().unwrap().up.set(Some(j));
-            j.up.get().unwrap().down.set(Some(j));
-
-            let jh = j.header.get().unwrap();
-            jh.size.set(jh.size.get() + 1);
+        for i in self.iterate_cells(hc, CellIteratorDirection::Up, false) {
+            for j in self.iterate_cells(i, CellIteratorDirection::Left, false) {
+                j.restore_ud();
+                j.header().increase_size();
+            }
         }
 
-        hc.right.get().unwrap().left.set(Some(hc));
-        hc.left.get().unwrap().right.set(Some(hc));
+        hc.restore_lr();
     }
 
     pub(crate) fn iterate_cells(
@@ -110,6 +98,8 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
         direction: CellIteratorDirection,
         mut include_start: bool,
     ) -> impl Iterator<Item = MatrixCellRef<'a, T>> {
+        use CellIteratorDirection::*;
+
         let mut end = false;
         let mut current = start;
 
@@ -126,10 +116,10 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
             let cell = current;
 
             current = match direction {
-                CellIteratorDirection::Up => cell.up.get().unwrap(),
-                CellIteratorDirection::Down => cell.down.get().unwrap(),
-                CellIteratorDirection::Left => cell.left.get().unwrap(),
-                CellIteratorDirection::Right => cell.right.get().unwrap(),
+                Up => cell.up(),
+                Down => cell.down(),
+                Left => cell.left(),
+                Right => cell.right(),
             };
 
             if current.index == start.index {
@@ -147,6 +137,8 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
         direction: HeaderIteratorDirection,
         mut include_start: bool,
     ) -> impl Iterator<Item = HeaderRef<'a, T>> {
+        use HeaderIteratorDirection::*;
+
         let mut end = false;
         let mut current = start;
 
@@ -161,14 +153,14 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
             }
 
             let current_header = current;
-            let cell = current_header.cell.get().unwrap();
+            let cell = current_header.cell();
 
             let next_header_cell = match &direction {
-                HeaderIteratorDirection::Right => cell.right.get().unwrap(),
-                HeaderIteratorDirection::Left => cell.left.get().unwrap(),
+                Right => cell.right(),
+                Left => cell.left(),
             };
 
-            current = next_header_cell.header.get().unwrap();
+            current = next_header_cell.header();
 
             if current.index == start.index {
                 end = true;
@@ -191,12 +183,8 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
         let header = self.locate_header(column)?;
         let row = row.into();
 
-        self.iterate_cells(
-            header.cell.get().unwrap(),
-            CellIteratorDirection::Down,
-            true,
-        )
-        .find(|c| c.row == row)
+        self.iterate_cells(header.cell(), CellIteratorDirection::Down, true)
+            .find(|c| c.row == row)
     }
 
     #[cfg(test)]
@@ -248,11 +236,11 @@ impl<'a, T: fmt::Debug + Eq> fmt::Debug for DancingLinksMatrix<'a, T> {
             matrix.push_str(&format!(
                 "{:>4} {:>4} {:>4} {:>4} {:>4} {:>4} {:>4}",
                 cell.index,
-                cell.up.get().unwrap().index,
-                cell.down.get().unwrap().index,
-                cell.left.get().unwrap().index,
-                cell.right.get().unwrap().index,
-                cell.header.get().unwrap().index,
+                cell.up().index,
+                cell.down().index,
+                cell.left().index,
+                cell.right().index,
+                cell.header().index,
                 cell.row
             ));
         }
@@ -356,7 +344,7 @@ where
                     }
                 }
 
-                match &c.header.get().unwrap().name {
+                match &c.name() {
                     HeaderName::First => panic!("A cell should not have the first header as name"),
                     HeaderName::Other(name) => {
                         set.insert(name.as_ref());

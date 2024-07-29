@@ -1,5 +1,6 @@
 //! The module contains the implementation of the cell and headers.
 
+use concat_idents::concat_idents;
 use std::{
     cell::Cell,
     fmt::{self, Display},
@@ -93,17 +94,32 @@ pub(crate) struct MatrixCell<'a, T> {
     /// The index of the cell.
     pub(crate) index: usize,
     /// Pointer to the cell above the current cell.
-    pub(crate) up: MatrixCellPtr<'a, T>,
+    up: MatrixCellPtr<'a, T>,
     /// Pointer to the cell below the current cell.
-    pub(crate) down: MatrixCellPtr<'a, T>,
+    down: MatrixCellPtr<'a, T>,
     /// Pointer to the cell to the left of the current cell.
-    pub(crate) left: MatrixCellPtr<'a, T>,
+    left: MatrixCellPtr<'a, T>,
     /// Pointer to the cell to the right of the current cell.
-    pub(crate) right: MatrixCellPtr<'a, T>,
+    right: MatrixCellPtr<'a, T>,
     /// Pointer to the header.
-    pub(crate) header: HeaderPtr<'a, T>,
+    header: HeaderPtr<'a, T>,
     /// The row of the cell.
     pub(crate) row: CellRow,
+}
+
+macro_rules! impl_field {
+    ($name: ident, $type: ty) => {
+        pub fn $name(&'a self) -> $type {
+            unsafe { self.$name.get().unwrap_unchecked() }
+        }
+
+        concat_idents!(fn_name = has_, $name {
+            #[allow(dead_code)]
+            pub fn fn_name(&'a self) -> bool {
+                self.$name.get().is_some()
+            }
+        });
+    };
 }
 
 impl<'a, T> MatrixCell<'a, T> {
@@ -126,6 +142,51 @@ impl<'a, T> MatrixCell<'a, T> {
             header: Cell::new(None),
             row,
         }
+    }
+
+    pub fn update_pointers(
+        &'a self,
+        up: MatrixCellRef<'a, T>,
+        down: MatrixCellRef<'a, T>,
+        left: MatrixCellRef<'a, T>,
+        right: MatrixCellRef<'a, T>,
+        header: HeaderRef<'a, T>,
+    ) {
+        self.up.set(Some(up));
+        self.down.set(Some(down));
+        self.left.set(Some(left));
+        self.right.set(Some(right));
+        self.header.set(Some(header));
+    }
+
+    impl_field!(up, MatrixCellRef<'a, T>);
+    impl_field!(down, MatrixCellRef<'a, T>);
+    impl_field!(left, MatrixCellRef<'a, T>);
+    impl_field!(right, MatrixCellRef<'a, T>);
+    impl_field!(header, HeaderRef<'a, T>);
+
+    pub fn name(&'a self) -> &HeaderName<T> {
+        &self.header().name
+    }
+
+    pub fn skip_lr(&'a self) {
+        self.right().left.set(self.left.get());
+        self.left().right.set(self.right.get());
+    }
+
+    pub fn skip_ud(&'a self) {
+        self.down().up.set(self.up.get());
+        self.up().down.set(self.down.get());
+    }
+
+    pub fn restore_lr(&'a self) {
+        self.right().left.set(Some(self));
+        self.left().right.set(Some(self));
+    }
+
+    pub fn restore_ud(&'a self) {
+        self.down().up.set(Some(self));
+        self.up().down.set(Some(self));
     }
 }
 
@@ -178,9 +239,9 @@ pub(crate) struct Header<'a, T> {
     /// The name of the header.
     pub(crate) name: HeaderName<T>,
     /// The size of the header.
-    pub(crate) size: Cell<usize>,
+    size: Cell<usize>,
     /// Pointer to the cell.
-    pub(crate) cell: MatrixCellPtr<'a, T>,
+    cell: MatrixCellPtr<'a, T>,
 }
 
 impl<'a, T> Header<'a, T> {
@@ -217,5 +278,23 @@ impl<'a, T> Header<'a, T> {
     #[allow(dead_code)]
     pub fn is_first(&self) -> bool {
         matches!(self.name, HeaderName::First)
+    }
+
+    pub fn update_pointer(&'a self, cell: MatrixCellRef<'a, T>) {
+        self.cell.set(Some(cell));
+    }
+
+    impl_field!(cell, MatrixCellRef<'a, T>);
+
+    pub fn increase_size(&'a self) {
+        self.size.set(self.size.get() + 1);
+    }
+
+    pub fn decrease_size(&'a self) {
+        self.size.set(self.size.get() - 1);
+    }
+
+    pub fn size(&'a self) -> usize {
+        self.size.get()
     }
 }
