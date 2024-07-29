@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt, hash::Hash, marker::PhantomData};
+use std::{collections::HashSet, fmt, hash::Hash, iter, marker::PhantomData};
 
 use rand::{thread_rng, Rng};
 
@@ -108,18 +108,75 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
         &self,
         start: MatrixCellRef<'a, T>,
         direction: CellIteratorDirection,
-        include_start: bool,
+        mut include_start: bool,
     ) -> impl Iterator<Item = MatrixCellRef<'a, T>> {
-        CellIterator::new(start, direction, include_start)
+        let mut end = false;
+        let mut current = start;
+
+        iter::from_fn(move || {
+            if end {
+                return None;
+            }
+
+            if include_start && current.index == start.index {
+                include_start = false;
+                return Some(current);
+            }
+
+            let cell = current;
+
+            current = match direction {
+                CellIteratorDirection::Up => cell.up.get().unwrap(),
+                CellIteratorDirection::Down => cell.down.get().unwrap(),
+                CellIteratorDirection::Left => cell.left.get().unwrap(),
+                CellIteratorDirection::Right => cell.right.get().unwrap(),
+            };
+
+            if current.index == start.index {
+                end = true;
+                return None;
+            }
+
+            Some(current)
+        })
     }
 
     pub(crate) fn iterate_headers(
         &self,
         start: HeaderRef<'a, T>,
         direction: HeaderIteratorDirection,
-        include_start: bool,
+        mut include_start: bool,
     ) -> impl Iterator<Item = HeaderRef<'a, T>> {
-        HeaderCellIterator::new(start, direction, include_start)
+        let mut end = false;
+        let mut current = start;
+
+        iter::from_fn(move || {
+            if end {
+                return None;
+            }
+
+            if include_start && current.index == start.index {
+                include_start = false;
+                return Some(current);
+            }
+
+            let current_header = current;
+            let cell = current_header.cell.get().unwrap();
+
+            let next_header_cell = match &direction {
+                HeaderIteratorDirection::Right => cell.right.get().unwrap(),
+                HeaderIteratorDirection::Left => cell.left.get().unwrap(),
+            };
+
+            current = next_header_cell.header.get().unwrap();
+
+            if current.index == start.index {
+                end = true;
+                return None;
+            }
+
+            Some(current)
+        })
     }
 
     #[cfg(test)]
@@ -333,124 +390,8 @@ pub(crate) enum CellIteratorDirection {
     Right,
 }
 
-pub(crate) struct CellIterator<'a, T> {
-    start: MatrixCellRef<'a, T>,
-    current: MatrixCellRef<'a, T>,
-    direction: CellIteratorDirection,
-    end: bool,
-    include_start: bool,
-}
-
-impl<'a, T> CellIterator<'a, T> {
-    fn new(
-        start: MatrixCellRef<'a, T>,
-        direction: CellIteratorDirection,
-        include_start: bool,
-    ) -> CellIterator<'a, T> {
-        CellIterator {
-            start,
-            current: start,
-            direction,
-            end: false,
-            include_start,
-        }
-    }
-}
-
-impl<'a, T> Iterator for CellIterator<'a, T>
-where
-    T: Eq,
-{
-    type Item = MatrixCellRef<'a, T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.end {
-            return None;
-        }
-
-        if self.include_start && self.current.index == self.start.index {
-            self.include_start = false;
-            return Some(self.current);
-        }
-
-        let cell = self.current;
-
-        self.current = match self.direction {
-            CellIteratorDirection::Up => cell.up.get().unwrap(),
-            CellIteratorDirection::Down => cell.down.get().unwrap(),
-            CellIteratorDirection::Left => cell.left.get().unwrap(),
-            CellIteratorDirection::Right => cell.right.get().unwrap(),
-        };
-
-        if self.current.index == self.start.index {
-            self.end = true;
-            return None;
-        }
-        Some(self.current)
-    }
-}
-
 #[allow(dead_code)]
 pub(crate) enum HeaderIteratorDirection {
     Right,
     Left,
-}
-
-pub(crate) struct HeaderCellIterator<'a, T> {
-    start: HeaderRef<'a, T>,
-    current: HeaderRef<'a, T>,
-    direction: HeaderIteratorDirection,
-    end: bool,
-    include_start: bool,
-}
-
-impl<'a, T> HeaderCellIterator<'a, T> {
-    fn new(
-        start: HeaderRef<'a, T>,
-        direction: HeaderIteratorDirection,
-        include_start: bool,
-    ) -> HeaderCellIterator<'a, T> {
-        HeaderCellIterator {
-            start,
-            current: start,
-            direction,
-            end: false,
-            include_start,
-        }
-    }
-}
-
-impl<'a, T> Iterator for HeaderCellIterator<'a, T>
-where
-    T: Eq,
-{
-    type Item = HeaderRef<'a, T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.end {
-            return None;
-        }
-
-        if self.include_start && self.current.index == self.start.index {
-            self.include_start = false;
-            return Some(self.current);
-        }
-
-        let current_header = self.current;
-        let cell = current_header.cell.get().unwrap();
-
-        let next_header_cell = match &self.direction {
-            HeaderIteratorDirection::Right => cell.right.get().unwrap(),
-            HeaderIteratorDirection::Left => cell.left.get().unwrap(),
-        };
-
-        self.current = next_header_cell.header.get().unwrap();
-
-        if self.current.index == self.start.index {
-            self.end = true;
-            return None;
-        }
-
-        Some(self.current)
-    }
 }
