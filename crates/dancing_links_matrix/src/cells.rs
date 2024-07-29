@@ -109,11 +109,13 @@ pub(crate) struct MatrixCell<'a, T> {
 
 macro_rules! impl_field {
     ($name: ident, $type: ty) => {
+        #[inline(always)]
         pub fn $name(&'a self) -> $type {
             unsafe { self.$name.get().unwrap_unchecked() }
         }
 
         concat_idents!(fn_name = has_, $name {
+            #[inline(always)]
             #[allow(dead_code)]
             pub fn fn_name(&'a self) -> bool {
                 self.$name.get().is_some()
@@ -165,6 +167,7 @@ impl<'a, T> MatrixCell<'a, T> {
     impl_field!(right, MatrixCellRef<'a, T>);
     impl_field!(header, HeaderRef<'a, T>);
 
+    #[inline(always)]
     pub fn name(&'a self) -> &HeaderName<T> {
         &self.header().name
     }
@@ -294,6 +297,7 @@ impl<'a, T> Header<'a, T> {
         self.size.set(self.size.get() - 1);
     }
 
+    #[inline(always)]
     pub fn size(&'a self) -> usize {
         self.size.get()
     }
