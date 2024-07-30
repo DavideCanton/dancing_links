@@ -2,6 +2,7 @@ mod arena;
 mod builders;
 mod cells;
 mod matrix;
+mod queue;
 mod solver;
 
 pub use arena::Arena;

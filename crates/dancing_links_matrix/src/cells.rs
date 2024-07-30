@@ -4,6 +4,7 @@ use concat_idents::concat_idents;
 use std::{
     cell::Cell,
     fmt::{self, Display},
+    hash::{Hash, Hasher},
     num::NonZero,
 };
 
@@ -216,7 +217,7 @@ impl<T: Display> Display for HeaderName<T> {
 ///
 /// The header prototype is then converted to a `HeaderCell` by converting the `cell`
 /// index to a pointer.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ProtoHeader<T> {
     /// The index of the header.
     pub(crate) index: usize,
@@ -224,11 +225,18 @@ pub(crate) struct ProtoHeader<T> {
     pub(crate) name: HeaderName<T>,
     /// The size of the header.
     pub(crate) size: usize,
+    /// If the header is a primary header.
+    pub(crate) primary: bool,
 }
 
 impl<T> ProtoHeader<T> {
-    pub(crate) fn new(index: usize, name: HeaderName<T>, size: usize) -> Self {
-        Self { index, name, size }
+    pub(crate) fn new(index: usize, name: HeaderName<T>, size: usize, primary: bool) -> Self {
+        Self {
+            index,
+            name,
+            size,
+            primary,
+        }
     }
 }
 
@@ -245,6 +253,7 @@ pub(crate) struct Header<'a, T> {
     size: Cell<usize>,
     /// Pointer to the cell.
     cell: MatrixCellPtr<'a, T>,
+    pub(crate) primary: bool,
 }
 
 impl<'a, T> Header<'a, T> {
@@ -257,12 +266,13 @@ impl<'a, T> Header<'a, T> {
     /// * `name` - The name of the header.
     /// * `index` - The index of the header.
     /// * `size` - The size of the header.
-    pub fn new(name: HeaderName<T>, index: usize, size: usize) -> Header<'a, T> {
+    pub fn new(name: HeaderName<T>, index: usize, size: usize, primary: bool) -> Header<'a, T> {
         Header {
             index,
             name,
             size: Cell::new(size),
             cell: Cell::new(None),
+            primary,
         }
     }
 
@@ -274,7 +284,7 @@ impl<'a, T> Header<'a, T> {
     ///
     /// * `proto` - The prototype of the header.
     pub fn from_proto(proto: ProtoHeader<T>) -> Header<'a, T> {
-        Self::new(proto.name, proto.index, proto.size)
+        Self::new(proto.name, proto.index, proto.size, proto.primary)
     }
 
     /// Checks if the header is the first header.
@@ -289,12 +299,14 @@ impl<'a, T> Header<'a, T> {
 
     impl_field!(cell, MatrixCellRef<'a, T>);
 
-    pub fn increase_size(&'a self) {
+    pub fn increase_size(&'a self) -> usize {
         self.size.set(self.size.get() + 1);
+        self.size.get()
     }
 
-    pub fn decrease_size(&'a self) {
+    pub fn decrease_size(&'a self) -> usize {
         self.size.set(self.size.get() - 1);
+        self.size.get()
     }
 
     #[inline(always)]
@@ -307,3 +319,17 @@ impl<'a, T> Header<'a, T> {
         self.size.get() == 0
     }
 }
+
+impl<'a, T> Hash for Header<'a, T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
+    }
+}
+
+impl<'a, T> PartialEq for Header<'a, T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index
+    }
+}
+
+impl<'a, T> Eq for Header<'a, T> {}

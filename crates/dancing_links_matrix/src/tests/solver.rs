@@ -19,12 +19,11 @@ fn solve_single_sol() {
     assert!(solutions.len() == 1);
 
     let solution = &solutions[0];
-    let k: HashSet<_> = solution.keys().copied().collect();
 
-    assert_eq!(k, HashSet::from_iter([1, 2, 3]));
-    assert_eq!(solution[&1], vec![1, 2]);
-    assert_eq!(solution[&2], vec![3, 4]);
-    assert_eq!(solution[&3], vec![5, 6]);
+    check(solution.keys(), [1, 2, 3]);
+    check(&solution[&1], [1, 2]);
+    check(&solution[&2], [3, 4]);
+    check(&solution[&3], [5, 6]);
 }
 
 #[test]
@@ -43,19 +42,17 @@ fn solve_multiple_sol() {
     assert_eq!(solutions.len(), 2);
 
     let solution = solutions.iter().find(|v| v.len() == 3).unwrap();
-    let k: HashSet<_> = solution.keys().copied().collect();
 
-    assert_eq!(k, HashSet::from_iter([1, 2, 3]));
-    assert_eq!(solution[&1], vec![1, 2]);
-    assert_eq!(solution[&2], vec![3, 4]);
-    assert_eq!(solution[&3], vec![5, 6]);
+    check(solution.keys(), [1, 2, 3]);
+    check(&solution[&1], [1, 2]);
+    check(&solution[&2], [3, 4]);
+    check(&solution[&3], [5, 6]);
 
     let solution = solutions.iter().find(|v| v.len() == 2).unwrap();
-    let k: HashSet<_> = solution.keys().copied().collect();
 
-    assert_eq!(k, HashSet::from_iter([4, 5]));
-    assert_eq!(solution[&4], vec![2, 3, 5]);
-    assert_eq!(solution[&5], vec![1, 4, 6]);
+    check(solution.keys(), [4, 5]);
+    check(&solution[&4], [2, 3, 5]);
+    check(&solution[&5], [1, 4, 6]);
 }
 
 #[test]
@@ -76,11 +73,11 @@ fn solve_first_sol() {
     let k: HashSet<_> = solution.keys().copied().collect();
 
     if k == HashSet::from_iter([1, 2]) {
-        assert_eq!(solution[&1], vec![1, 2]);
-        assert_eq!(solution[&2], vec![3, 4]);
+        check(&solution[&1], [1, 2]);
+        check(&solution[&2], [3, 4]);
     } else if k == HashSet::from_iter([3, 4]) {
-        assert_eq!(solution[&3], vec![3, 4]);
-        assert_eq!(solution[&4], vec![1, 4]);
+        check(&solution[&3], [3, 4]);
+        check(&solution[&4], [1, 4]);
     } else {
         panic!("Unexpected solution {k:?}");
     }
@@ -89,4 +86,13 @@ fn solve_first_sol() {
 fn solve<'a>(solver: &'a IterativeAlgorithmXSolver<'a, usize>) -> Vec<HashMap<usize, Vec<usize>>> {
     let solutions = solver.solve();
     solutions.into_iter().map(|v| v.solution_map).collect()
+}
+
+fn check<'a>(
+    actual: impl IntoIterator<Item = &'a usize>,
+    expected: impl IntoIterator<Item = usize>,
+) {
+    let actual: HashSet<_> = actual.into_iter().copied().collect();
+    let expected: HashSet<_> = expected.into_iter().collect();
+    assert_eq!(actual, expected);
 }

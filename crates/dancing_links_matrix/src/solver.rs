@@ -79,7 +79,11 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
         }
     }
 
-    fn create_sol(&self, k: usize, sol_dict: &HashMap<usize, MatrixCellRef<'a, T>>) -> Solution<T> {
+    fn create_sol(
+        &self,
+        k: usize,
+        sol_dict: &hashbrown::HashMap<usize, MatrixCellRef<'a, T>>,
+    ) -> Solution<T> {
         let mut sol = HashMap::new();
 
         for (key, row) in sol_dict.iter() {
@@ -107,7 +111,7 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
 
     pub fn solve(&'a self) -> Vec<Solution<T>> {
         let mut solutions = Vec::new();
-        let mut sol_dict = HashMap::new();
+        let mut sol_dict = hashbrown::HashMap::new();
 
         let mut advance = false;
 
@@ -166,9 +170,9 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
                 }
                 _ => {
                     let start_col = if self.choose_min {
-                        self.matrix.min_column().unwrap()
+                        self.matrix.min_column()
                     } else {
-                        self.matrix.random_column().unwrap()
+                        self.matrix.random_column()
                     };
                     if start_col.empty() {
                         advance = true;
@@ -200,7 +204,7 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
 }
 
 fn add_to_sol<'a, T: Eq>(
-    sol_dict: &mut HashMap<usize, MatrixCellRef<'a, T>>,
+    sol_dict: &mut hashbrown::HashMap<usize, MatrixCellRef<'a, T>>,
     k: usize,
     next_row: MatrixCellRef<'a, T>,
     current_col: HeaderRef<'a, T>,

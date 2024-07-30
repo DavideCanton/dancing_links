@@ -10,7 +10,10 @@ use std::{
 use itertools::Itertools;
 use rand::{thread_rng, Rng};
 
-use crate::cells::{CellRow, Header, HeaderName, HeaderRef, MatrixCellRef};
+use crate::{
+    cells::{CellRow, Header, HeaderName, HeaderRef, MatrixCellRef},
+    queue::HeaderPriorityQueue,
+};
 
 pub struct ColumnSpec<T> {
     pub(crate) name: T,
@@ -44,6 +47,7 @@ pub struct DancingLinksMatrix<'a, T> {
     pub(crate) columns: usize,
     pub(crate) headers: Box<[HeaderRef<'a, T>]>,
     pub(crate) cells: Box<[MatrixCellRef<'a, T>]>,
+    pub(crate) headers_queue: HeaderPriorityQueue<'a, T>,
 }
 
 impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
@@ -59,30 +63,31 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
         RowIterator::new(self)
     }
 
-    pub(crate) fn min_column(&'a self) -> Option<HeaderRef<'a, T>> {
-        self.iterate_headers(self.first_header(), HeaderIteratorDirection::Right, false)
-            .min_by_key(|h| h.size())
+    pub(crate) fn min_column(&'a self) -> HeaderRef<'a, T> {
+        self.headers_queue.peek().unwrap()
     }
 
-    pub(crate) fn random_column(&'a self) -> Option<HeaderRef<'a, T>> {
-        if self.columns == 0 {
-            return None;
-        }
-
+    pub(crate) fn random_column(&'a self) -> HeaderRef<'a, T> {
         let num = thread_rng().gen_range(0..self.columns);
 
         self.iterate_headers(self.first_header(), HeaderIteratorDirection::Right, false)
             .nth(num)
+            .unwrap()
     }
 
     pub(crate) fn cover(&'a self, header: HeaderRef<'a, T>) {
+        let pq = &self.headers_queue;
+
         let hc = header.cell();
         hc.skip_lr();
+
+        pq.remove(header);
 
         for i in self.iterate_cells(hc, CellIteratorDirection::Down, false) {
             for j in self.iterate_cells(i, CellIteratorDirection::Right, false) {
                 j.skip_ud();
                 j.header().decrease_size();
+                pq.change_priority(j.header());
             }
         }
     }
@@ -90,14 +95,21 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
     pub(crate) fn uncover(&'a self, header: HeaderRef<'a, T>) {
         let hc = header.cell();
 
+        let pq = &self.headers_queue;
+
         for i in self.iterate_cells(hc, CellIteratorDirection::Up, false) {
             for j in self.iterate_cells(i, CellIteratorDirection::Left, false) {
                 j.restore_ud();
                 j.header().increase_size();
+                pq.change_priority(j.header());
             }
         }
 
         hc.restore_lr();
+
+        if header.primary {
+            pq.push(header);
+        }
     }
 
     pub(crate) fn iterate_cells(
@@ -201,10 +213,7 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
         T: AsRef<C>,
     {
         self.iterate_headers(self.first_header(), HeaderIteratorDirection::Right, true)
-            .find(|h| match h.name {
-                HeaderName::Other(ref c) => *c.as_ref() == *column,
-                _ => false,
-            })
+            .find(|h| matches!(h.name, HeaderName::Other(ref c) if *c.as_ref() == *column))
     }
 }
 

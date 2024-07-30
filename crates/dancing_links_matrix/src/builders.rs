@@ -10,6 +10,7 @@ use crate::{
     arena::Arena,
     cells::{CellRow, Header, HeaderName, MatrixCell, ProtoCell, ProtoHeader},
     matrix::{ColumnSpec, DancingLinksMatrix},
+    queue::HeaderPriorityQueue,
 };
 
 /// A builder for a [`DancingLinksMatrix`].
@@ -106,11 +107,11 @@ impl<T: Eq> MatrixColBuilder<T> {
             cells: Vec::new(),
         };
 
-        let first_header_index = matrix.add_header(HeaderName::First);
+        let first_header_index = matrix.add_header(HeaderName::First, true);
         let mut prev_index = first_header_index;
 
         for spec in column_names {
-            let header_index = matrix.add_header(HeaderName::Other(spec.name));
+            let header_index = matrix.add_header(HeaderName::Other(spec.name), spec.primary);
 
             if spec.primary {
                 matrix.link_right(prev_index, header_index);
@@ -267,10 +268,6 @@ where
             cells.push(cell);
         }
 
-        for h in headers.iter_mut() {
-            h.update_pointer(cells[h.index]);
-        }
-
         for pc in matrix.cells {
             cells[pc.index].update_pointers(
                 cells[pc.up],
@@ -281,11 +278,21 @@ where
             );
         }
 
+        let headers_queue = HeaderPriorityQueue::new();
+
+        for h in headers.iter_mut() {
+            h.update_pointer(cells[h.index]);
+            if h.index > 0 && h.primary {
+                headers_queue.push(*h);
+            }
+        }
+
         DancingLinksMatrix {
             headers: headers.into_boxed_slice(),
             cells: cells.into_boxed_slice(),
             rows: matrix.rows,
             columns: matrix.columns,
+            headers_queue,
         }
     }
 }
@@ -305,13 +312,14 @@ impl<T> BuildingMatrix<T> {
         cell_index
     }
 
-    fn add_header(&mut self, name: HeaderName<T>) -> usize {
+    fn add_header(&mut self, name: HeaderName<T>, primary: bool) -> usize {
         let header_index = self.headers.len();
         let header_cell_index = self.add_cell(header_index, CellRow::Header);
 
         assert_eq!(header_index, header_cell_index);
 
-        self.headers.push(ProtoHeader::new(header_index, name, 0));
+        self.headers
+            .push(ProtoHeader::new(header_index, name, 0, primary));
 
         header_index
     }
