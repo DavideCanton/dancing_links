@@ -239,7 +239,7 @@ fn test_cell_iterator_down(include_start: bool) {
     );
 }
 
-fn build_matrix<'a>(arena: &'a impl Arena) -> DancingLinksMatrix<'a, String> {
+fn build_matrix(arena: &impl Arena) -> DancingLinksMatrix<'_, String> {
     MatrixBuilder
         .add_column(1.to_string())
         .add_column(2.to_string())

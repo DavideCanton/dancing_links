@@ -19,7 +19,7 @@ use super::utils::create_row;
 /// |     |     | 8   | 9   |
 /// |     | 10  | 11  | 12  |
 /// ```
-fn build_matrix<'a>(arena: &'a impl Arena) -> DancingLinksMatrix<'a, String> {
+fn build_matrix(arena: &impl Arena) -> DancingLinksMatrix<'_, String> {
     MatrixBuilder
         .add_column(1.to_string())
         .add_column(2.to_string())
@@ -102,9 +102,8 @@ fn test_builder_cells() {
 
 fn index_map<'a, T>(index: &[&'a T]) -> HashMap<usize, &'a T> {
     let mut map = HashMap::new();
-    for i in 0..index.len() {
-        let ptr = index[i];
-        map.insert(i, ptr);
+    for (i, ptr) in index.iter().enumerate() {
+        map.insert(i, *ptr);
     }
     map
 }

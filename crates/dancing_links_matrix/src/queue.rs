@@ -36,6 +36,6 @@ impl<'a, T> HeaderPriorityQueue<'a, T> {
     }
 }
 
-fn header_priority<'a, T>(header: HeaderRef<'a, T>) -> (isize, usize) {
+fn header_priority<T>(header: HeaderRef<'_, T>) -> (isize, usize) {
     (-(header.size() as isize), header.index)
 }

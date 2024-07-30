@@ -275,8 +275,8 @@ impl<'a, T: fmt::Display + Eq> fmt::Display for &'a DancingLinksMatrix<'a, T> {
             .enumerate()
         {
             let ind = i * 5;
-            inds.insert((*header).index, ind);
-            rows[0].replace_range(ind..ind + 4, &format!("{:>4}", (*header).name));
+            inds.insert(header.index, ind);
+            rows[0].replace_range(ind..ind + 4, &format!("{:>4}", header.name));
         }
 
         for header in
@@ -286,8 +286,8 @@ impl<'a, T: fmt::Display + Eq> fmt::Display for &'a DancingLinksMatrix<'a, T> {
                 let header = c.header();
                 let ind = inds[&header.index];
 
-                let row: usize = (*c).row.into();
-                rows[row].replace_range(ind..ind + 4, &format!("{:>4}", (*c).index));
+                let row: usize = c.row.into();
+                rows[row].replace_range(ind..ind + 4, &format!("{:>4}", c.index));
             }
         }
 
