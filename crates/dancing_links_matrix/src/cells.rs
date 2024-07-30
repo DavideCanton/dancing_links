@@ -301,4 +301,9 @@ impl<'a, T> Header<'a, T> {
     pub fn size(&'a self) -> usize {
         self.size.get()
     }
+
+    #[inline(always)]
+    pub fn empty(&'a self) -> bool {
+        self.size.get() == 0
+    }
 }

@@ -1,5 +1,13 @@
-use std::{collections::HashSet, fmt, hash::Hash, iter, marker::PhantomData};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    hash::Hash,
+    iter,
+    marker::PhantomData,
+    ptr,
+};
 
+use itertools::Itertools;
 use rand::{thread_rng, Rng};
 
 use crate::cells::{CellRow, Header, HeaderName, HeaderRef, MatrixCellRef};
@@ -108,7 +116,7 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
                 return None;
             }
 
-            if include_start && current.index == start.index {
+            if include_start && ptr::eq(current, start) {
                 include_start = false;
                 return Some(current);
             }
@@ -122,7 +130,7 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
                 Right => cell.right(),
             };
 
-            if current.index == start.index {
+            if ptr::eq(current, start) {
                 end = true;
                 return None;
             }
@@ -147,7 +155,7 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
                 return None;
             }
 
-            if include_start && current.index == start.index {
+            if include_start && ptr::eq(current, start) {
                 include_start = false;
                 return Some(current);
             }
@@ -162,7 +170,7 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
 
             current = next_header_cell.header();
 
-            if current.index == start.index {
+            if ptr::eq(current, start) {
                 end = true;
                 return None;
             }
@@ -248,8 +256,7 @@ impl<'a, T: fmt::Debug + Eq> fmt::Debug for DancingLinksMatrix<'a, T> {
     }
 }
 
-#[cfg(any())]
-impl<'a, T: fmt::Display + Eq> fmt::Display for DancingLinksMatrix<'a, T> {
+impl<'a, T: fmt::Display + Eq> fmt::Display for &'a DancingLinksMatrix<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut rows = vec![" ".repeat(self.headers.len() * 5); self.rows + 1];
         let mut inds = HashMap::new();
@@ -266,12 +273,8 @@ impl<'a, T: fmt::Display + Eq> fmt::Display for DancingLinksMatrix<'a, T> {
         for header in
             self.iterate_headers(self.first_header(), HeaderIteratorDirection::Right, true)
         {
-            for c in self.iterate_cells(
-                header.cell.get().unwrap(),
-                CellIteratorDirection::Down,
-                false,
-            ) {
-                let header = c.header.get().unwrap();
+            for c in self.iterate_cells(header.cell(), CellIteratorDirection::Down, false) {
+                let header = c.header();
                 let ind = inds[&header.index];
 
                 let row: usize = (*c).row.into();

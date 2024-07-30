@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::{Debug, Formatter},
+    ptr,
 };
 
 use log::debug;
@@ -122,7 +123,7 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
             let header = self.matrix.first_header();
             let header_cell = header.cell();
 
-            if header_cell.right().index == header_cell.index {
+            if ptr::eq(header_cell.right(), header_cell) {
                 let sol = self.create_sol(k, &sol_dict);
                 solutions.push(sol);
                 if self.return_first {
@@ -146,7 +147,7 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
                     uncover_row(&self.matrix, current_row);
 
                     let next_row = current_row.down();
-                    if next_row.index == start_row.index {
+                    if ptr::eq(next_row, start_row) {
                         let col = next_row.header();
                         self.matrix.uncover(col);
                         advance = true;
@@ -169,7 +170,7 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
                     } else {
                         self.matrix.random_column().unwrap()
                     };
-                    if start_col.size() == 0 {
+                    if start_col.empty() {
                         advance = true;
                         continue;
                     }
