@@ -106,7 +106,7 @@ fn print_sol(sol: &Solution<String>) {
     }
 }
 
-#[time]
+#[time("info")]
 fn solve_it<'a>(solver: &'a IterativeAlgorithmXSolver<'a, String>) {
     let solutions = solver.solve();
 
@@ -120,7 +120,7 @@ fn solve_it<'a>(solver: &'a IterativeAlgorithmXSolver<'a, String>) {
     }
 }
 
-#[time]
+#[time("info")]
 fn build_matrix<'a>(
     known: HashMap<(usize, usize), usize>,
     arena: &'a impl Arena,
