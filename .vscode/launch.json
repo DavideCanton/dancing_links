@@ -25,7 +25,7 @@
       "request": "launch",
       "name": "Debug executable 'nqueens' on linux",
       "program": "${workspaceRoot}/target/debug/nqueens",
-      "args": ["4", "0"],
+      "args": ["4"],
       "cwd": "${workspaceRoot}"
     },
     {
@@ -54,7 +54,7 @@
 
         }
       },
-      "args": ["test_locate_header"],
+      "args": ["solve_single_sol"],
       "cwd": "${workspaceFolder}"
     }
   ]
