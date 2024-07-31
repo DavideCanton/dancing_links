@@ -16,13 +16,13 @@ pub struct Solution<T> {
     pub solution_map: HashMap<usize, Vec<T>>,
 }
 
-fn cover_row<'a, T: Eq>(matrix: &'a DancingLinksMatrix<'a, T>, row: MatrixCellRef<'a, T>) {
+fn cover_row<'a, T: Eq>(matrix: &DancingLinksMatrix<'a, T>, row: MatrixCellRef<'a, T>) {
     for j in matrix.iterate_cells(row, CellIteratorDirection::Right, false) {
         matrix.cover(j.header())
     }
 }
 
-fn uncover_row<'a, T: Eq>(matrix: &'a DancingLinksMatrix<'a, T>, row: MatrixCellRef<'a, T>) {
+fn uncover_row<'a, T: Eq>(matrix: &DancingLinksMatrix<'a, T>, row: MatrixCellRef<'a, T>) {
     for j in matrix.iterate_cells(row, CellIteratorDirection::Left, false) {
         matrix.uncover(j.header())
     }
@@ -109,7 +109,7 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
         Solution { solution_map: sol }
     }
 
-    pub fn solve(&'a self) -> Vec<Solution<T>> {
+    pub fn solve(&self) -> Vec<Solution<T>> {
         let mut solutions = Vec::new();
         let mut sol_dict = hashbrown::HashMap::new();
 

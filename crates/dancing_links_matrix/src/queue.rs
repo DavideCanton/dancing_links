@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use priority_queue::PriorityQueue;
 
-use crate::cells::HeaderRef;
+use crate::cells::{Header, HeaderRef};
 
 pub(crate) struct HeaderPriorityQueue<'a, T> {
     queue: RefCell<PriorityQueue<HeaderRef<'a, T>, (isize, usize)>>,
@@ -16,9 +16,9 @@ impl<'a, T> HeaderPriorityQueue<'a, T> {
     }
 
     pub(crate) fn push(&self, header: HeaderRef<'a, T>) {
-        self.queue
-            .borrow_mut()
-            .push(header, header_priority(header));
+        let priority = header_priority(header);
+        let mut queue = self.queue.borrow_mut();
+        queue.push(header, priority);
     }
 
     pub(crate) fn remove(&self, header: HeaderRef<'a, T>) {
@@ -36,6 +36,6 @@ impl<'a, T> HeaderPriorityQueue<'a, T> {
     }
 }
 
-fn header_priority<T>(header: HeaderRef<'_, T>) -> (isize, usize) {
+fn header_priority<T>(header: &Header<'_, T>) -> (isize, usize) {
     (-(header.size() as isize), header.index)
 }

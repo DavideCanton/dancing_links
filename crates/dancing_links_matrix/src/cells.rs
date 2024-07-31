@@ -111,14 +111,14 @@ pub(crate) struct MatrixCell<'a, T> {
 macro_rules! impl_field {
     ($name: ident, $type: ty) => {
         #[inline(always)]
-        pub fn $name(&'a self) -> $type {
+        pub fn $name(&self) -> $type {
             unsafe { self.$name.get().unwrap_unchecked() }
         }
 
         concat_idents!(fn_name = has_, $name {
             #[inline(always)]
             #[allow(dead_code)]
-            pub fn fn_name(&'a self) -> bool {
+            pub fn fn_name(&self) -> bool {
                 self.$name.get().is_some()
             }
         });
@@ -169,16 +169,16 @@ impl<'a, T> MatrixCell<'a, T> {
     impl_field!(header, HeaderRef<'a, T>);
 
     #[inline(always)]
-    pub fn name(&'a self) -> &HeaderName<T> {
+    pub fn name(&self) -> &HeaderName<T> {
         &self.header().name
     }
 
-    pub fn skip_lr(&'a self) {
+    pub fn skip_lr(&self) {
         self.right().left.set(self.left.get());
         self.left().right.set(self.right.get());
     }
 
-    pub fn skip_ud(&'a self) {
+    pub fn skip_ud(&self) {
         self.down().up.set(self.up.get());
         self.up().down.set(self.down.get());
     }
@@ -201,6 +201,15 @@ pub(crate) enum HeaderName<T> {
     First,
     /// The header is a regular header.
     Other(T),
+}
+
+impl<T> HeaderName<T> {
+    pub fn get_name(&self) -> Option<&T> {
+        match self {
+            HeaderName::Other(name) => Some(name),
+            HeaderName::First => None,
+        }
+    }
 }
 
 impl<T: Display> Display for HeaderName<T> {
@@ -293,29 +302,29 @@ impl<'a, T> Header<'a, T> {
         matches!(self.name, HeaderName::First)
     }
 
-    pub fn update_pointer(&'a self, cell: MatrixCellRef<'a, T>) {
+    pub fn update_pointer(&self, cell: MatrixCellRef<'a, T>) {
         self.cell.set(Some(cell));
     }
 
     impl_field!(cell, MatrixCellRef<'a, T>);
 
-    pub fn increase_size(&'a self) -> usize {
+    pub fn increase_size(&self) -> usize {
         self.size.set(self.size.get() + 1);
         self.size.get()
     }
 
-    pub fn decrease_size(&'a self) -> usize {
+    pub fn decrease_size(&self) -> usize {
         self.size.set(self.size.get() - 1);
         self.size.get()
     }
 
     #[inline(always)]
-    pub fn size(&'a self) -> usize {
+    pub fn size(&self) -> usize {
         self.size.get()
     }
 
     #[inline(always)]
-    pub fn empty(&'a self) -> bool {
+    pub fn empty(&self) -> bool {
         self.size.get() == 0
     }
 }

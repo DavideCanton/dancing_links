@@ -107,7 +107,8 @@ fn print_sol(sol: &Solution<String>) {
 }
 
 #[time("info")]
-fn solve_it<'a>(solver: &'a IterativeAlgorithmXSolver<'a, String>) {
+fn solve<'a>(matrix: DancingLinksMatrix<'a, String>) {
+    let solver = IterativeAlgorithmXSolver::new(matrix, true, true);
     let solutions = solver.solve();
 
     match solutions.into_iter().next() {
@@ -121,10 +122,10 @@ fn solve_it<'a>(solver: &'a IterativeAlgorithmXSolver<'a, String>) {
 }
 
 #[time("info")]
-fn build_matrix<'a>(
+fn build_matrix(
     known: HashMap<(usize, usize), usize>,
-    arena: &'a impl Arena,
-) -> DancingLinksMatrix<'a, String> {
+    arena: &impl Arena,
+) -> DancingLinksMatrix<'_, String> {
     let mut matrix_builder = MatrixBuilder::from_iterable(names());
 
     for (i, j) in prod() {
@@ -194,7 +195,5 @@ fn main() {
     let arena: BumpArena = Bump::new().into();
     let known = load_board(&path);
     let matrix = build_matrix(known, &arena);
-    let solver = IterativeAlgorithmXSolver::new(matrix, true, true);
-
-    solve_it(&solver);
+    solve(matrix);
 }

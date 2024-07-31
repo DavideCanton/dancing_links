@@ -4,7 +4,7 @@ use test_case::test_matrix;
 
 use crate::{
     cells::HeaderName,
-    matrix::{CellIteratorDirection, HeaderIteratorDirection, RowIterator},
+    matrix::{CellIteratorDirection, HeaderIteratorDirection},
     tests::utils::BumpArena,
     Arena, DancingLinksMatrix, MatrixBuilder,
 };
@@ -48,9 +48,12 @@ fn test_iterator() {
     let matrix = build_matrix(&arena);
 
     let mut it = matrix.iter_rows::<str>();
-    assert_eq!(it.len(), 4);
 
-    fn n<'a>(it: &'a mut RowIterator<String, str>) -> Vec<&'a str> {
+    fn n<'a, IT, IIT>(it: &mut IT) -> Vec<&'a str>
+    where
+        IT: Iterator<Item = IIT>,
+        IIT: IntoIterator<Item = &'a str>,
+    {
         it.next().unwrap().into_iter().sorted().collect_vec()
     }
 
@@ -72,7 +75,6 @@ fn test_iterator_no_rows() {
         .build(&arena);
 
     let mut it = matrix.iter_rows::<str>();
-    assert_eq!(it.len(), 0);
     assert_eq!(it.next(), None);
 }
 

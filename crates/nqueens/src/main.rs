@@ -50,7 +50,8 @@ fn build_matrix<'a>(n: usize, arena: &'a impl Arena) -> DancingLinksMatrix<'a, S
 }
 
 #[time("info")]
-fn solve<'a>(solver: &'a IterativeAlgorithmXSolver<'a, String>, n: usize) {
+fn solve<'a>(matrix: DancingLinksMatrix<'a, String>, n: usize) {
+    let solver = IterativeAlgorithmXSolver::new(matrix, true, true);
     let solutions = solver.solve();
 
     match solutions.into_iter().next() {
@@ -98,6 +99,5 @@ fn main() {
     let n = args.n;
     let arena: BumpArena = Bump::new().into();
     let matrix = build_matrix(n, &arena);
-    let solver = IterativeAlgorithmXSolver::new(matrix, true, true);
-    solve(&solver, n);
+    solve(matrix, n);
 }
