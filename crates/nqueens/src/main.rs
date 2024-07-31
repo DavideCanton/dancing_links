@@ -1,8 +1,8 @@
+use bumpalo::Bump;
 use clap::Parser;
-use cmd_common::{init_log, CommonArgs};
+use cmd_common::{init_log, BumpArena, CommonArgs};
 use dancing_links_matrix::{
-    ColumnSpec, DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder,
-    RecursiveAlgorithmXSolver, Solution,
+    Arena, ColumnSpec, DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder, Solution,
 };
 use itertools::Itertools;
 use logging_timer::time;
@@ -38,20 +38,20 @@ fn compute_row(i: usize, j: usize, n: usize) -> Vec<usize> {
 }
 
 #[time("info")]
-fn build_matrix(n: usize) -> DancingLinksMatrix<String> {
+fn build_matrix<'a>(n: usize, arena: &'a impl Arena) -> DancingLinksMatrix<'a, String> {
     let mut matrix_builder = MatrixBuilder::from_iterable(names(n));
 
     for (i, j) in (0..n).cartesian_product(0..n) {
         let row = compute_row(i, j, n);
-        matrix_builder = matrix_builder.add_sorted_row_key(row);
+        matrix_builder = matrix_builder.add_sorted_row_index(row);
     }
 
-    matrix_builder.build()
+    matrix_builder.build(arena)
 }
 
 #[time("info")]
-fn solve(matrix: DancingLinksMatrix<String>, n: usize) {
-    let mut solver = IterativeAlgorithmXSolver::new(matrix, true, true);
+fn solve<'a>(matrix: DancingLinksMatrix<'a, String>, n: usize) {
+    let solver = IterativeAlgorithmXSolver::new(matrix, true, true);
     let solutions = solver.solve();
 
     match solutions.into_iter().next() {
@@ -61,16 +61,6 @@ fn solve(matrix: DancingLinksMatrix<String>, n: usize) {
         Some(sol) => {
             print_sol(n, &sol);
         }
-    }
-}
-
-#[time("info")]
-fn solve_rec(matrix: DancingLinksMatrix<String>, n: usize) {
-    let mut solver = RecursiveAlgorithmXSolver::new(matrix, move |sol| print_sol(n, sol), true);
-    let found = solver.solve();
-
-    if !found {
-        println!("No solution found");
     }
 }
 
@@ -107,11 +97,7 @@ fn main() {
     init_log(&args.common_args);
 
     let n = args.n;
-    let matrix = build_matrix(n);
-
-    if args.common_args.recursive {
-        solve_rec(matrix, n);
-    } else {
-        solve(matrix, n);
-    }
+    let arena: BumpArena = Bump::new().into();
+    let matrix = build_matrix(n, &arena);
+    solve(matrix, n);
 }

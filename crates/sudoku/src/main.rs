@@ -6,11 +6,11 @@ use std::{
     str::FromStr,
 };
 
+use bumpalo::Bump;
 use clap::Parser;
-use cmd_common::{init_log, CommonArgs};
+use cmd_common::{init_log, BumpArena, CommonArgs};
 use dancing_links_matrix::{
-    DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder, RecursiveAlgorithmXSolver,
-    Solution,
+    Arena, DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder, Solution,
 };
 use itertools::Itertools;
 use logging_timer::time;
@@ -106,24 +106,9 @@ fn print_sol(sol: &Solution<String>) {
     }
 }
 
-#[time]
-fn solve_rec(matrix: DancingLinksMatrix<String>) {
-    let mut solver = RecursiveAlgorithmXSolver::new(
-        matrix,
-        |sol| {
-            print_sol(sol);
-            true
-        },
-        true,
-    );
-    if !solver.solve() {
-        println!("No solution found");
-    }
-}
-
-#[time]
-fn solve_it(matrix: DancingLinksMatrix<String>) {
-    let mut solver = IterativeAlgorithmXSolver::new(matrix, true, true);
+#[time("info")]
+fn solve<'a>(matrix: DancingLinksMatrix<'a, String>) {
+    let solver = IterativeAlgorithmXSolver::new(matrix, true, true);
     let solutions = solver.solve();
 
     match solutions.into_iter().next() {
@@ -136,28 +121,29 @@ fn solve_it(matrix: DancingLinksMatrix<String>) {
     }
 }
 
-#[time]
+#[time("info")]
 fn build_matrix(
     known: HashMap<(usize, usize), usize>,
-) -> dancing_links_matrix::DancingLinksMatrix<String> {
+    arena: &impl Arena,
+) -> DancingLinksMatrix<'_, String> {
     let mut matrix_builder = MatrixBuilder::from_iterable(names());
 
     for (i, j) in prod() {
         match known.get(&(i, j)) {
             Some(v) => {
                 let row = compute_row(i, j, *v);
-                matrix_builder = matrix_builder.add_sorted_row_key(row);
+                matrix_builder = matrix_builder.add_sorted_row_index(row);
             }
             None => {
                 for v in 1..=9 {
                     let row = compute_row(i, j, v);
-                    matrix_builder = matrix_builder.add_sorted_row_key(row);
+                    matrix_builder = matrix_builder.add_sorted_row_index(row);
                 }
             }
         }
     }
 
-    matrix_builder.build()
+    matrix_builder.build(arena)
 }
 
 fn load_board(path: &Path) -> HashMap<(usize, usize), usize> {
@@ -206,12 +192,8 @@ fn main() {
         panic!("Not a file");
     }
 
+    let arena: BumpArena = Bump::new().into();
     let known = load_board(&path);
-    let matrix = build_matrix(known);
-
-    if args.common_args.recursive {
-        solve_rec(matrix);
-    } else {
-        solve_it(matrix);
-    }
+    let matrix = build_matrix(known, &arena);
+    solve(matrix);
 }

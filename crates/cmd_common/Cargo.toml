@@ -7,3 +7,5 @@ edition = "2021"
 log.workspace = true
 clap.workspace = true
 simple_logger.workspace = true
+bumpalo.workspace = true
+dancing_links_matrix = { path = "../dancing_links_matrix" }

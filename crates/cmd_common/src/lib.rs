@@ -1,16 +1,13 @@
 use clap::Parser;
 use log::Level;
 
+mod impls;
+
+pub use impls::BumpArena;
+
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct CommonArgs {
-    #[arg(
-        short,
-        long,
-        default_value_t = false,
-        help = "Use a recursive solver, disabled by default."
-    )]
-    pub recursive: bool,
     #[arg(
         short,
         long,
@@ -31,5 +28,4 @@ pub fn init_log(args: &CommonArgs) {
     simple_logger::init_with_level(level).unwrap();
 
     log::info!("using log level: {:?}", level);
-    log::info!("recursive: {:?}", args.recursive);
 }

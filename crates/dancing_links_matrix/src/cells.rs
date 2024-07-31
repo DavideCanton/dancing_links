@@ -1,8 +1,12 @@
-//! The module contains the implementation of the cell and header cells.
+//! The module contains the implementation of the cell and headers.
 
-use std::fmt::{self, Display};
-
-use crate::keys::{HeaderKey, Key};
+use concat_idents::concat_idents;
+use std::{
+    cell::Cell,
+    fmt::{self, Display},
+    hash::{Hash, Hasher},
+    num::NonZero,
+};
 
 /// The row of the cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -10,7 +14,7 @@ pub(crate) enum CellRow {
     /// The row is the header row.
     Header,
     /// The row is a data row.
-    Data(usize),
+    Data(NonZero<usize>),
 }
 
 impl From<usize> for CellRow {
@@ -18,7 +22,7 @@ impl From<usize> for CellRow {
     fn from(name: usize) -> Self {
         match name {
             0 => CellRow::Header,
-            name => CellRow::Data(name),
+            name => CellRow::Data(unsafe { NonZero::new_unchecked(name) }),
         }
     }
 }
@@ -28,7 +32,7 @@ impl From<CellRow> for usize {
     fn from(row: CellRow) -> Self {
         match row {
             CellRow::Header => panic!("Cannot convert Header to usize"),
-            CellRow::Data(name) => name,
+            CellRow::Data(name) => name.into(),
         }
     }
 }
@@ -43,53 +47,169 @@ impl Display for CellRow {
     }
 }
 
-/// The cell of the matrix.
+/// Struct containing a cell prototype. It is constructed while building the matrix.
+///
+/// The cell prototype is then converted to a `MatrixCell` by converting the indexes
+/// to pointers.
 #[derive(Debug)]
-pub(crate) struct MatrixCell {
-    /// The key of the cell.
-    pub(crate) key: Key,
-    /// The key of the cell above the current cell.
-    pub(crate) up: Key,
-    /// The key of the cell below the current cell.
-    pub(crate) down: Key,
-    /// The key of the cell to the left of the current cell.
-    pub(crate) left: Key,
-    /// The key of the cell to the right of the current cell.
-    pub(crate) right: Key,
-    /// The key of the header cell.
-    pub(crate) header: HeaderKey,
-    /// The row of the cell.
+pub(crate) struct ProtoCell {
+    pub(crate) index: usize,
+    pub(crate) up: usize,
+    pub(crate) down: usize,
+    pub(crate) left: usize,
+    pub(crate) right: usize,
+    pub(crate) header: usize,
     pub(crate) row: CellRow,
 }
 
-impl MatrixCell {
-    /// Creates a new cell.
+impl ProtoCell {
+    /// Creates a new cell prototype.
     ///
     /// # Arguments
     ///
-    /// * `key` - The key of the cell.
-    /// * `header` - The key of the header cell.
+    /// * `index` - The index of the cell.
+    /// * `header` - The index of the header.
     /// * `row` - The row of the cell.
-    pub fn new(key: Key, header: HeaderKey, row: CellRow) -> MatrixCell {
-        MatrixCell {
-            key,
-            up: key,
-            down: key,
-            left: key,
-            right: key,
+    pub(crate) fn new(index: usize, header: usize, row: CellRow) -> Self {
+        ProtoCell {
+            index,
+            up: index,
+            down: index,
+            left: index,
+            right: index,
             header,
             row,
         }
     }
 }
 
-/// The name of the header cell.
+pub type MatrixCellRef<'a, T> = &'a MatrixCell<'a, T>;
+pub type MatrixCellPtr<'a, T> = Cell<Option<MatrixCellRef<'a, T>>>;
+
+pub type HeaderRef<'a, T> = &'a Header<'a, T>;
+pub type HeaderPtr<'a, T> = Cell<Option<HeaderRef<'a, T>>>;
+
+/// The cell of the matrix.
+#[derive(Debug)]
+pub(crate) struct MatrixCell<'a, T> {
+    /// The index of the cell.
+    pub(crate) index: usize,
+    /// Pointer to the cell above the current cell.
+    up: MatrixCellPtr<'a, T>,
+    /// Pointer to the cell below the current cell.
+    down: MatrixCellPtr<'a, T>,
+    /// Pointer to the cell to the left of the current cell.
+    left: MatrixCellPtr<'a, T>,
+    /// Pointer to the cell to the right of the current cell.
+    right: MatrixCellPtr<'a, T>,
+    /// Pointer to the header.
+    header: HeaderPtr<'a, T>,
+    /// The row of the cell.
+    pub(crate) row: CellRow,
+}
+
+macro_rules! impl_field {
+    ($name: ident, $type: ty) => {
+        #[inline(always)]
+        pub fn $name(&self) -> $type {
+            unsafe { self.$name.get().unwrap_unchecked() }
+        }
+
+        concat_idents!(fn_name = has_, $name {
+            #[inline(always)]
+            #[allow(dead_code)]
+            pub fn fn_name(&self) -> bool {
+                self.$name.get().is_some()
+            }
+        });
+    };
+}
+
+impl<'a, T> MatrixCell<'a, T> {
+    /// Creates a new cell.
+    ///
+    /// All its links are set to `null_mut()`.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - The index of the cell.
+    /// * `header` - A pointer to the header.
+    /// * `row` - The row of the cell.
+    pub fn new(index: usize, row: CellRow) -> MatrixCell<'a, T> {
+        MatrixCell {
+            index,
+            up: Cell::new(None),
+            down: Cell::new(None),
+            left: Cell::new(None),
+            right: Cell::new(None),
+            header: Cell::new(None),
+            row,
+        }
+    }
+
+    pub fn update_pointers(
+        &'a self,
+        up: MatrixCellRef<'a, T>,
+        down: MatrixCellRef<'a, T>,
+        left: MatrixCellRef<'a, T>,
+        right: MatrixCellRef<'a, T>,
+        header: HeaderRef<'a, T>,
+    ) {
+        self.up.set(Some(up));
+        self.down.set(Some(down));
+        self.left.set(Some(left));
+        self.right.set(Some(right));
+        self.header.set(Some(header));
+    }
+
+    impl_field!(up, MatrixCellRef<'a, T>);
+    impl_field!(down, MatrixCellRef<'a, T>);
+    impl_field!(left, MatrixCellRef<'a, T>);
+    impl_field!(right, MatrixCellRef<'a, T>);
+    impl_field!(header, HeaderRef<'a, T>);
+
+    #[inline(always)]
+    pub fn name(&self) -> &HeaderName<T> {
+        &self.header().name
+    }
+
+    pub fn skip_lr(&self) {
+        self.right().left.set(self.left.get());
+        self.left().right.set(self.right.get());
+    }
+
+    pub fn skip_ud(&self) {
+        self.down().up.set(self.up.get());
+        self.up().down.set(self.down.get());
+    }
+
+    pub fn restore_lr(&'a self) {
+        self.right().left.set(Some(self));
+        self.left().right.set(Some(self));
+    }
+
+    pub fn restore_ud(&'a self) {
+        self.down().up.set(Some(self));
+        self.up().down.set(Some(self));
+    }
+}
+
+/// The name of the header.
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub(crate) enum HeaderName<T> {
-    /// The header cell is the first header cell.
+    /// The header is the first header.
     First,
-    /// The header cell is a regular header cell.
+    /// The header is a regular header.
     Other(T),
+}
+
+impl<T> HeaderName<T> {
+    pub fn get_name(&self) -> Option<&T> {
+        match self {
+            HeaderName::Other(name) => Some(name),
+            HeaderName::First => None,
+        }
+    }
 }
 
 impl<T: Display> Display for HeaderName<T> {
@@ -102,41 +222,123 @@ impl<T: Display> Display for HeaderName<T> {
     }
 }
 
-/// The header cell of the matrix.
+/// Struct containing a header prototype. It is constructed while building the matrix.
 ///
-/// Contains the key of a physical cell linked to the header cell.
-#[derive(Debug)]
-pub(crate) struct HeaderCell<T> {
-    /// The key of the header cell.
-    pub(crate) key: HeaderKey,
-    /// The name of the header cell.
+/// The header prototype is then converted to a `HeaderCell` by converting the `cell`
+/// index to a pointer.
+#[derive(Debug, Clone)]
+pub(crate) struct ProtoHeader<T> {
+    /// The index of the header.
+    pub(crate) index: usize,
+    /// The name of the header.
     pub(crate) name: HeaderName<T>,
-    /// The size of the header cell.
+    /// The size of the header.
     pub(crate) size: usize,
-    /// The key of the cell.
-    pub(crate) cell: Key,
+    /// If the header is a primary header.
+    pub(crate) primary: bool,
 }
 
-impl<T> HeaderCell<T> {
-    /// Creates a new header cell.
+impl<T> ProtoHeader<T> {
+    pub(crate) fn new(index: usize, name: HeaderName<T>, size: usize, primary: bool) -> Self {
+        Self {
+            index,
+            name,
+            size,
+            primary,
+        }
+    }
+}
+
+/// A header of the matrix.
+///
+/// Contains a pointer to a physical cell linked to the header.
+#[derive(Debug)]
+pub(crate) struct Header<'a, T> {
+    /// The index of the header.
+    pub(crate) index: usize,
+    /// The name of the header.
+    pub(crate) name: HeaderName<T>,
+    /// The size of the header.
+    size: Cell<usize>,
+    /// Pointer to the cell.
+    cell: MatrixCellPtr<'a, T>,
+    pub(crate) primary: bool,
+}
+
+impl<'a, T> Header<'a, T> {
+    /// Creates a new header.
+    ///
+    /// The `cell` field is left to null.
     ///
     /// # Arguments
     ///
-    /// * `name` - The name of the header cell.
-    /// * `key` - The key of the header cell.
-    /// * `cell_key` - The key of the linked cell.
-    pub fn new(name: HeaderName<T>, key: HeaderKey, cell_key: Key) -> HeaderCell<T> {
-        HeaderCell {
-            key,
+    /// * `name` - The name of the header.
+    /// * `index` - The index of the header.
+    /// * `size` - The size of the header.
+    pub fn new(name: HeaderName<T>, index: usize, size: usize, primary: bool) -> Header<'a, T> {
+        Header {
+            index,
             name,
-            size: 0,
-            cell: cell_key,
+            size: Cell::new(size),
+            cell: Cell::new(None),
+            primary,
         }
     }
 
-    /// Checks if the header cell is the first header cell.
+    /// Creates a new header from a `ProtoHeader`.
+    ///
+    /// The `cell` field is left to null.
+    ///
+    /// # Arguments
+    ///
+    /// * `proto` - The prototype of the header.
+    pub fn from_proto(proto: ProtoHeader<T>) -> Header<'a, T> {
+        Self::new(proto.name, proto.index, proto.size, proto.primary)
+    }
+
+    /// Checks if the header is the first header.
     #[allow(dead_code)]
     pub fn is_first(&self) -> bool {
         matches!(self.name, HeaderName::First)
     }
+
+    pub fn update_pointer(&self, cell: MatrixCellRef<'a, T>) {
+        self.cell.set(Some(cell));
+    }
+
+    impl_field!(cell, MatrixCellRef<'a, T>);
+
+    pub fn increase_size(&self) -> usize {
+        self.size.set(self.size.get() + 1);
+        self.size.get()
+    }
+
+    pub fn decrease_size(&self) -> usize {
+        self.size.set(self.size.get() - 1);
+        self.size.get()
+    }
+
+    #[inline(always)]
+    pub fn size(&self) -> usize {
+        self.size.get()
+    }
+
+    #[inline(always)]
+    pub fn empty(&self) -> bool {
+        self.size.get() == 0
+    }
 }
+
+impl<'a, T> Hash for Header<'a, T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
+    }
+}
+
+impl<'a, T> PartialEq for Header<'a, T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index
+    }
+}
+
+impl<'a, T> Eq for Header<'a, T> {}

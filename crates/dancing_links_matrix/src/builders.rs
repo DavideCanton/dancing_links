@@ -7,10 +7,10 @@
 use itertools::Itertools;
 
 use crate::{
-    cells::{CellRow, HeaderCell, HeaderName, MatrixCell},
-    index::{IndexBuilder, IndexOps, VecIndexBuilder},
-    keys::{HeaderKey, Key},
+    arena::Arena,
+    cells::{CellRow, Header, HeaderName, MatrixCell, ProtoCell, ProtoHeader},
     matrix::{ColumnSpec, DancingLinksMatrix},
+    queue::HeaderPriorityQueue,
 };
 
 /// A builder for a [`DancingLinksMatrix`].
@@ -100,32 +100,26 @@ impl<T: Eq> MatrixColBuilder<T> {
         }
         let column_names = self.columns;
 
-        let headers = VecIndexBuilder::with_capacity(column_names.len() + 1);
-
         let mut matrix = BuildingMatrix {
-            header_key: headers.next_key(),
-            headers,
-            cells: VecIndexBuilder::new(),
             rows: 0,
             columns: column_names.len(),
+            headers: Vec::new(),
+            cells: Vec::new(),
         };
 
-        let (header_key, header_cell_key) = matrix.add_header(HeaderName::First);
-        matrix.header_key = header_key;
-
-        let mut prev_cell_key = header_cell_key;
+        let first_header_index = matrix.add_header(HeaderName::First, true);
+        let mut prev_index = first_header_index;
 
         for spec in column_names {
-            let primary = spec.primary;
-            let (_, cell_key) = matrix.add_header(HeaderName::Other(spec.name));
+            let header_index = matrix.add_header(HeaderName::Other(spec.name), spec.primary);
 
-            if primary {
-                matrix.link_right(prev_cell_key, cell_key);
-                prev_cell_key = cell_key;
+            if spec.primary {
+                matrix.link_right(prev_index, header_index);
+                prev_index = header_index;
             }
         }
 
-        matrix.link_right(prev_cell_key, header_cell_key);
+        matrix.link_right(prev_index, first_header_index);
 
         MatrixRowBuilder { matrix }
     }
@@ -154,18 +148,17 @@ impl<T> MatrixRowBuilder<T>
 where
     T: Eq,
 {
-    /// Add a row to the [`MatrixRowBuilder`] using key values.
+    /// Add a row to the [`MatrixRowBuilder`] using indexes.
     ///
-    /// Keys must be of a type that is convertible into an usize, and must be in the range from 1 to `n`,
-    /// where `n` is the number of columns in the matrix, in the order that the columns were added.
+    /// Indexes must be in the range from 1 to `n` where `n` is the number of columns in the matrix, in the order that the columns were added.
     ///
-    /// Use `add_sorted_row_key` if the keys are already sorted, to avoid sorting them twice.
+    /// Use `add_sorted_row_index` if the indexes are already sorted, to avoid sorting them twice.
     ///
     /// [`MatrixRowBuilder`]: MatrixRowBuilder
-    pub fn add_row_key(self, row: impl IntoIterator<Item = impl Into<HeaderKey> + Ord>) -> Self {
+    pub fn add_row_index(self, row: impl IntoIterator<Item = usize>) -> Self {
         let mut sorted = row.into_iter().collect_vec();
         sorted.sort_unstable();
-        self.add_sorted_row_key(sorted)
+        self.add_sorted_row_index(sorted)
     }
 
     /// Add a row to the [`MatrixRowBuilder`].
@@ -182,14 +175,13 @@ where
         self.add_sorted_row(sorted)
     }
 
-    /// Add a sorted row to the [`MatrixRowBuilder`] using key values.
+    /// Add a sorted row to the [`MatrixRowBuilder`] using index values.
     ///
-    /// Keys must be of a type that is convertible into an usize, and must be in the range from 1 to `n`,
-    /// where `n` is the number of columns in the matrix, in the order that the columns were added.
+    /// Indexes must be in the range from 1 to `n`, where `n` is the number of columns in the matrix, in the order that the columns were added.
     ///
     /// [`MatrixRowBuilder`]: MatrixRowBuilder
-    pub fn add_sorted_row_key(self, row: impl IntoIterator<Item = impl Into<HeaderKey>>) -> Self {
-        self._add_sorted_row(row.into_iter().map(|v| v.into()))
+    pub fn add_sorted_row_index(self, row: impl IntoIterator<Item = usize>) -> Self {
+        self._add_sorted_row(row)
     }
 
     /// Add a sorted row to the [`MatrixRowBuilder`].
@@ -206,7 +198,7 @@ where
                 for header in headers_iter.by_ref() {
                     if let HeaderName::Other(name) = &header.name {
                         if *name == val {
-                            to_add.push(header.key);
+                            to_add.push(header.index);
                             added = true;
                             break;
                         }
@@ -223,17 +215,17 @@ where
         self._add_sorted_row(to_add)
     }
 
-    fn _add_sorted_row(mut self, row: impl IntoIterator<Item = HeaderKey>) -> Self {
+    fn _add_sorted_row(mut self, row: impl IntoIterator<Item = usize>) -> Self {
         let mx = &mut self.matrix;
 
         let mut cell_index = None;
         let mut prev_index = None;
         let mut start_index = None;
 
-        for header_key in row {
+        for header_idx in row {
             // TODO check if ind is valid
 
-            let in_cell_index = mx.add_cell(header_key, CellRow::Data(mx.rows + 1));
+            let in_cell_index = mx.add_cell(header_idx, (mx.rows + 1).into());
             cell_index = Some(in_cell_index);
 
             match prev_index {
@@ -245,12 +237,10 @@ where
                 }
             }
 
-            let header = mx.header_mut(header_key);
-            let header_cell_index = header.cell;
-            header.size += 1;
-            let last = mx.cell_mut(header_cell_index).up;
+            mx.headers[header_idx].size += 1;
+            let last = mx.cells[header_idx].up;
 
-            mx.link_down(in_cell_index, header_cell_index);
+            mx.link_down(in_cell_index, header_idx);
             mx.link_down(last, in_cell_index);
 
             prev_index = cell_index;
@@ -262,62 +252,85 @@ where
         self
     }
 
-    pub fn build(self) -> DancingLinksMatrix<T> {
+    pub fn build(self, bump: &impl Arena) -> DancingLinksMatrix<'_, T> {
         let matrix = self.matrix;
 
+        let mut headers = Vec::new();
+        let mut cells = Vec::new();
+
+        for header in matrix.headers {
+            let header = bump.alloc(Header::from_proto(header));
+            headers.push(header);
+        }
+
+        for cell in matrix.cells.iter() {
+            let cell = bump.alloc(MatrixCell::new(cell.index, cell.row));
+            cells.push(cell);
+        }
+
+        for pc in matrix.cells {
+            cells[pc.index].update_pointers(
+                cells[pc.up],
+                cells[pc.down],
+                cells[pc.left],
+                cells[pc.right],
+                headers[pc.header],
+            );
+        }
+
+        let headers_queue = HeaderPriorityQueue::new();
+
+        for h in headers.iter_mut() {
+            h.update_pointer(cells[h.index]);
+            if h.index > 0 && h.primary {
+                headers_queue.push(*h);
+            }
+        }
+
         DancingLinksMatrix {
-            headers: matrix.headers.finalize(),
-            cells: matrix.cells.finalize(),
+            headers: headers.into_boxed_slice(),
+            cells: cells.into_boxed_slice(),
             rows: matrix.rows,
             columns: matrix.columns,
-            header_key: matrix.header_key,
+            headers_queue,
         }
     }
 }
 
 struct BuildingMatrix<T> {
-    pub(crate) header_key: HeaderKey,
-    pub(crate) headers: VecIndexBuilder<HeaderCell<T>, HeaderKey>,
-    pub(crate) cells: VecIndexBuilder<MatrixCell, Key>,
     pub(crate) rows: usize,
     pub(crate) columns: usize,
+    pub(crate) headers: Vec<ProtoHeader<T>>,
+    pub(crate) cells: Vec<ProtoCell>,
 }
 
 impl<T> BuildingMatrix<T> {
-    fn add_cell(&mut self, header_cell_key: HeaderKey, row: CellRow) -> Key {
-        let cell_key = self.cells.next_key();
-        let cell = MatrixCell::new(cell_key, header_cell_key, row);
-        let actual_key = self.cells.insert(cell);
-        assert_eq!(actual_key, cell_key);
-        actual_key
+    fn add_cell(&mut self, header_index: usize, row: CellRow) -> usize {
+        let cell_index = self.cells.len();
+        self.cells
+            .push(ProtoCell::new(cell_index, header_index, row));
+        cell_index
     }
 
-    fn add_header(&mut self, name: HeaderName<T>) -> (HeaderKey, Key) {
-        let header_key = self.headers.next_key();
-        let header_cell_key = self.add_cell(header_key, CellRow::Header);
+    fn add_header(&mut self, name: HeaderName<T>, primary: bool) -> usize {
+        let header_index = self.headers.len();
+        let header_cell_index = self.add_cell(header_index, CellRow::Header);
 
-        let header = HeaderCell::new(name, header_key, header_cell_key);
-        let actual_header_key = self.headers.insert(header);
-        assert_eq!(header_key, actual_header_key);
+        assert_eq!(header_index, header_cell_index);
 
-        (actual_header_key, header_cell_key)
+        self.headers
+            .push(ProtoHeader::new(header_index, name, 0, primary));
+
+        header_index
     }
 
-    fn link_right(&mut self, left: Key, right: Key) {
-        self.cell_mut(left).right = right;
-        self.cell_mut(right).left = left;
+    fn link_right(&mut self, left: usize, right: usize) {
+        self.cells[left].right = right;
+        self.cells[right].left = left;
     }
 
-    fn link_down(&mut self, up: Key, down: Key) {
-        self.cell_mut(up).down = down;
-        self.cell_mut(down).up = up;
-    }
-
-    fn cell_mut(&mut self, key: Key) -> &mut MatrixCell {
-        self.cells.get_mut(key)
-    }
-
-    fn header_mut(&mut self, key: HeaderKey) -> &mut HeaderCell<T> {
-        self.headers.get_mut(key)
+    fn link_down(&mut self, up: usize, down: usize) {
+        self.cells[up].down = down;
+        self.cells[down].up = up;
     }
 }
