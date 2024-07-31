@@ -19,10 +19,10 @@ pub(crate) enum CellRow {
 
 impl From<usize> for CellRow {
     /// Converts a `usize` into a `CellRow`.
-    fn from(name: usize) -> Self {
-        match name {
+    fn from(index: usize) -> Self {
+        match index {
             0 => CellRow::Header,
-            name => CellRow::Data(unsafe { NonZero::new_unchecked(name) }),
+            index => CellRow::Data(unsafe { NonZero::new_unchecked(index) }),
         }
     }
 }
