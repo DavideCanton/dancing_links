@@ -252,19 +252,19 @@ where
         self
     }
 
-    pub fn build(self, bump: &impl Arena) -> DancingLinksMatrix<'_, T> {
+    pub fn build(self, arena: &impl Arena) -> DancingLinksMatrix<'_, T> {
         let matrix = self.matrix;
 
         let mut headers = Vec::new();
         let mut cells = Vec::new();
 
         for header in matrix.headers {
-            let header = bump.alloc(Header::from_proto(header));
+            let header = arena.alloc(Header::from_proto(header));
             headers.push(header);
         }
 
         for cell in matrix.cells.iter() {
-            let cell = bump.alloc(MatrixCell::new(cell.index, cell.row));
+            let cell = arena.alloc(MatrixCell::new(cell.index, cell.row));
             cells.push(cell);
         }
 
