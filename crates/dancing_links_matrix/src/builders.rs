@@ -352,7 +352,7 @@ impl<T> ProtoMatrix<T> {
         assert_eq!(column_index, column_cell_index);
 
         self.columns
-            .push(ProtoColumn::new(column_index, name,  primary));
+            .push(ProtoColumn::new(column_index, name, primary));
 
         column_index
     }
