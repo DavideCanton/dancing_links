@@ -8,9 +8,9 @@ use itertools::Itertools;
 
 use crate::{
     arena::Arena,
-    cells::{CellRow, Header, HeaderName, MatrixCell, ProtoCell, ProtoHeader},
+    cells::{CellRow, ColumnInfo, ColumnName, MatrixCell, ProtoCell, ProtoColumn},
     matrix::{ColumnSpec, DancingLinksMatrix},
-    queue::HeaderPriorityQueue,
+    queue::ColumnPriorityQueue,
 };
 
 /// A builder for a [`DancingLinksMatrix`].
@@ -48,6 +48,9 @@ impl Default for MatrixBuilder {
     }
 }
 
+/// A builder for adding columns to a matrix.
+///
+/// Columns must be added to the matrix before the rows can be added.
 pub struct MatrixColBuilder<T> {
     columns: Vec<ColumnSpec<T>>,
 }
@@ -69,8 +72,13 @@ impl<T, I: Into<ColumnSpec<T>>> FromIterator<I> for MatrixColBuilder<T> {
 }
 
 impl<T> MatrixColBuilder<T> {
+    /// Create a new [`MatrixColBuilder`].
+    ///
+    /// [`MatrixColBuilder`]: MatrixColBuilder
     fn new() -> MatrixColBuilder<T> {
-        MatrixColBuilder { columns: vec![] }
+        MatrixColBuilder {
+            columns: Vec::new(),
+        }
     }
 
     /// Add a column to the matrix being built.
@@ -94,33 +102,41 @@ impl<T> MatrixColBuilder<T> {
         }
         let column_names = self.columns;
 
-        let mut matrix = BuildingMatrix {
-            rows: 0,
-            columns: column_names.len(),
-            headers: Vec::new(),
+        let mut matrix = ProtoMatrix {
+            row_count: 0,
+            column_count: column_names.len(),
+            columns: Vec::new(),
             cells: Vec::new(),
         };
 
-        let first_header_index = matrix.add_header(HeaderName::First, true);
-        let mut prev_index = first_header_index;
+        let first_col_index = matrix.add_column(ColumnName::First, true);
+        let mut prev_index = first_col_index;
 
         for spec in column_names {
-            let header_index = matrix.add_header(HeaderName::Other(spec.name), spec.primary);
+            let col_index = matrix.add_column(ColumnName::Other(spec.name), spec.primary);
 
             if spec.primary {
-                matrix.link_right(prev_index, header_index);
-                prev_index = header_index;
+                matrix.link_horizontal(prev_index, col_index);
+                prev_index = col_index;
             }
         }
 
-        matrix.link_right(prev_index, first_header_index);
+        matrix.link_horizontal(prev_index, first_col_index);
 
         MatrixRowBuilder { matrix }
     }
 }
 
+/// A builder for adding rows to a matrix.
+///
+/// Columns must be added to the matrix before the rows can be added.
+///
+/// This is created by calling [`MatrixBuilder::from_iterable`] or [`MatrixColBuilder::end_columns`].
+///
+/// [`MatrixBuilder::from_iterable`]: MatrixBuilder::from_iterable
+/// [`MatrixColBuilder::end_columns`]: MatrixColBuilder::end_columns
 pub struct MatrixRowBuilder<T> {
-    matrix: BuildingMatrix<T>,
+    matrix: ProtoMatrix<T>,
 }
 
 impl<T, I> FromIterator<I> for MatrixRowBuilder<T>
@@ -184,14 +200,14 @@ impl<T> MatrixRowBuilder<T> {
         let mut to_add = Vec::new();
 
         {
-            let mut headers_iter = self.matrix.headers.iter();
+            let mut col_iter = self.matrix.columns.iter();
 
             for val in row {
                 let mut added = false;
-                for header in headers_iter.by_ref() {
-                    if let HeaderName::Other(name) = &header.name {
+                for column in col_iter.by_ref() {
+                    if let ColumnName::Other(name) = &column.name {
                         if *name == val {
-                            to_add.push(header.index);
+                            to_add.push(column.index);
                             added = true;
                             break;
                         }
@@ -211,118 +227,144 @@ impl<T> MatrixRowBuilder<T> {
     fn _add_sorted_row(mut self, row: impl IntoIterator<Item = usize>) -> Self {
         let mx = &mut self.matrix;
 
-        let mut cell_index = None;
+        let mut cur_index = None;
         let mut prev_index = None;
         let mut start_index = None;
 
-        for header_idx in row {
+        for col_index in row {
             // TODO check if ind is valid
 
-            let in_cell_index = mx.add_cell(header_idx, (mx.rows + 1).into());
-            cell_index = Some(in_cell_index);
+            let new_cell_index = mx.add_cell(col_index, (mx.row_count + 1).into());
+            cur_index = Some(new_cell_index);
 
             match prev_index {
                 Some(prev_index) => {
-                    mx.link_right(prev_index, in_cell_index);
+                    mx.link_horizontal(prev_index, new_cell_index);
                 }
                 None => {
-                    start_index = cell_index;
+                    start_index = cur_index;
                 }
             }
 
-            mx.headers[header_idx].size += 1;
-            let last = mx.cells[header_idx].up;
+            mx.columns[col_index].size += 1;
+            let last = mx.cells[col_index].up;
 
-            mx.link_down(in_cell_index, header_idx);
-            mx.link_down(last, in_cell_index);
+            mx.link_vertical(new_cell_index, col_index);
+            mx.link_vertical(last, new_cell_index);
 
-            prev_index = cell_index;
+            prev_index = cur_index;
         }
 
-        mx.link_right(cell_index.unwrap(), start_index.unwrap());
+        mx.link_horizontal(cur_index.unwrap(), start_index.unwrap());
 
-        mx.rows += 1;
+        mx.row_count += 1;
         self
     }
 
+    /// Build the [`DancingLinksMatrix`] from the columns and rows added.
+    ///
+    /// Receives an [`Arena`] to allocate memory for the matrix cells and columns.
+    ///
+    /// The matrix will have the same lifetime as the arena itself.
+    ///
+    /// [`DancingLinksMatrix`]: crate::matrix::DancingLinksMatrix
+    /// [`Arena`]: crate::arena::Arena
     pub fn build(self, arena: &impl Arena) -> DancingLinksMatrix<'_, T> {
         let matrix = self.matrix;
 
-        let mut headers = Vec::new();
+        let mut columns = Vec::new();
         let mut cells = Vec::new();
 
-        for header in matrix.headers {
-            let header = arena.alloc(Header::from_proto(header));
-            headers.push(header);
+        for column in matrix.columns {
+            let column = arena.alloc(ColumnInfo::from_proto(column));
+            columns.push(column);
         }
 
-        for cell in matrix.cells.iter() {
-            let cell = arena.alloc(MatrixCell::new(cell.index, cell.row));
-            cells.push(cell);
+        for ProtoCell { index, row, .. } in matrix.cells.iter() {
+            cells.push(arena.alloc(MatrixCell::new(*index, *row)));
         }
 
-        for pc in matrix.cells {
-            cells[pc.index].update_pointers(
-                cells[pc.up],
-                cells[pc.down],
-                cells[pc.left],
-                cells[pc.right],
-                headers[pc.header],
+        for ProtoCell {
+            index,
+            up,
+            down,
+            left,
+            right,
+            column,
+            ..
+        } in matrix.cells
+        {
+            cells[index].update_pointers(
+                cells[up],
+                cells[down],
+                cells[left],
+                cells[right],
+                columns[column],
             );
         }
 
-        let headers_queue = HeaderPriorityQueue::new();
+        let columns_queue = ColumnPriorityQueue::new();
 
-        for h in headers.iter_mut() {
-            h.update_pointer(cells[h.index]);
-            if h.index > 0 && h.primary {
-                headers_queue.push(*h);
+        for col in columns.iter_mut() {
+            col.update_pointer(cells[col.index]);
+
+            if let ColumnInfo {
+                name: ColumnName::Other(_),
+                primary: true,
+                ..
+            } = col
+            {
+                columns_queue.push(*col);
             }
         }
 
         DancingLinksMatrix {
-            headers: headers.into_boxed_slice(),
+            columns: columns.into_boxed_slice(),
             cells: cells.into_boxed_slice(),
-            rows: matrix.rows,
-            columns: matrix.columns,
-            headers_queue,
+            row_count: matrix.row_count,
+            column_count: matrix.column_count,
+            columns_queue,
         }
     }
 }
 
-struct BuildingMatrix<T> {
-    pub(crate) rows: usize,
-    pub(crate) columns: usize,
-    pub(crate) headers: Vec<ProtoHeader<T>>,
+/// A matrix being built.
+struct ProtoMatrix<T> {
+    pub(crate) row_count: usize,
+    pub(crate) column_count: usize,
+    pub(crate) columns: Vec<ProtoColumn<T>>,
     pub(crate) cells: Vec<ProtoCell>,
 }
 
-impl<T> BuildingMatrix<T> {
-    fn add_cell(&mut self, header_index: usize, row: CellRow) -> usize {
+impl<T> ProtoMatrix<T> {
+    /// Adds a cell to the matrix, returning the index of the cell.
+    fn add_cell(&mut self, column: usize, row: CellRow) -> usize {
         let cell_index = self.cells.len();
-        self.cells
-            .push(ProtoCell::new(cell_index, header_index, row));
+        self.cells.push(ProtoCell::new(cell_index, column, row));
         cell_index
     }
 
-    fn add_header(&mut self, name: HeaderName<T>, primary: bool) -> usize {
-        let header_index = self.headers.len();
-        let header_cell_index = self.add_cell(header_index, CellRow::Header);
+    /// Adds a column to the matrix, returning the index of the column.
+    fn add_column(&mut self, name: ColumnName<T>, primary: bool) -> usize {
+        let column_index = self.columns.len();
+        let column_cell_index = self.add_cell(column_index, CellRow::Header);
 
-        assert_eq!(header_index, header_cell_index);
+        assert_eq!(column_index, column_cell_index);
 
-        self.headers
-            .push(ProtoHeader::new(header_index, name, 0, primary));
+        self.columns
+            .push(ProtoColumn::new(column_index, name,  primary));
 
-        header_index
+        column_index
     }
 
-    fn link_right(&mut self, left: usize, right: usize) {
+    /// Links two cells together, from left to right.
+    fn link_horizontal(&mut self, left: usize, right: usize) {
         self.cells[left].right = right;
         self.cells[right].left = left;
     }
 
-    fn link_down(&mut self, up: usize, down: usize) {
+    /// Links two cells together, from up to down.
+    fn link_vertical(&mut self, up: usize, down: usize) {
         self.cells[up].down = down;
         self.cells[down].up = up;
     }

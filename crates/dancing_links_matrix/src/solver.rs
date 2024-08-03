@@ -7,8 +7,8 @@ use std::{
 use log::debug;
 
 use crate::{
-    cells::{CellRow, HeaderName, HeaderRef, MatrixCellRef},
-    matrix::CellIteratorDirection,
+    cells::{CellRow, ColumnName, ColumnRef, MatrixCellRef},
+    matrix::CellIteratorDir,
     DancingLinksMatrix,
 };
 
@@ -17,14 +17,14 @@ pub struct Solution<'a, T> {
 }
 
 fn cover_row<'a, T>(matrix: &DancingLinksMatrix<'a, T>, row: MatrixCellRef<'a, T>) {
-    for j in matrix.iterate_cells(row, CellIteratorDirection::Right, false) {
-        matrix.cover(j.header())
+    for j in matrix.iterate_cells(row, CellIteratorDir::Right, false) {
+        matrix.cover(j.column())
     }
 }
 
 fn uncover_row<'a, T>(matrix: &DancingLinksMatrix<'a, T>, row: MatrixCellRef<'a, T>) {
-    for j in matrix.iterate_cells(row, CellIteratorDirection::Left, false) {
-        matrix.uncover(j.header())
+    for j in matrix.iterate_cells(row, CellIteratorDir::Left, false) {
+        matrix.uncover(j.column())
     }
 }
 
@@ -101,9 +101,9 @@ impl<'a, T> IterativeAlgorithmXSolver<'a, T> {
             let mut tmp_list = Vec::new();
             for r in self
                 .matrix
-                .iterate_cells(*row, CellIteratorDirection::Right, true)
+                .iterate_cells(*row, CellIteratorDir::Right, true)
             {
-                if let HeaderName::Other(ref name) = r.name() {
+                if let ColumnName::Other(ref name) = r.name() {
                     tmp_list.push(name);
                 }
             }
@@ -131,10 +131,10 @@ impl<'a, T> IterativeAlgorithmXSolver<'a, T> {
 
             let k = elem.k();
 
-            let header = self.matrix.first_header();
-            let header_cell = header.cell();
+            let column = self.matrix.first_column();
+            let column_cell = column.cell();
 
-            if ptr::eq(header_cell.right(), header_cell) {
+            if ptr::eq(column_cell.right(), column_cell) {
                 let sol = self.create_sol(k, &sol_dict);
                 solutions.push(sol);
                 if self.return_first {
@@ -159,7 +159,7 @@ impl<'a, T> IterativeAlgorithmXSolver<'a, T> {
 
                     let next_row = current_row.down();
                     if ptr::eq(next_row, start_row) {
-                        let col = next_row.header();
+                        let col = next_row.column();
                         self.matrix.uncover(col);
                         advance = true;
                         continue;
@@ -169,7 +169,7 @@ impl<'a, T> IterativeAlgorithmXSolver<'a, T> {
                             current_row: next_row,
                             start_row,
                         });
-                        let col = start_row.header();
+                        let col = start_row.column();
                         add_to_sol(&mut sol_dict, k - 1, next_row, col);
                         advance = false;
                     }
@@ -214,7 +214,7 @@ fn add_to_sol<'a, T>(
     sol_dict: &mut hashbrown::HashMap<usize, MatrixCellRef<'a, T>>,
     k: usize,
     next_row: MatrixCellRef<'a, T>,
-    current_col: HeaderRef<'a, T>,
+    current_col: ColumnRef<'a, T>,
 ) {
     let row = next_row.row;
     let cur = current_col.index;
@@ -224,7 +224,7 @@ fn add_to_sol<'a, T>(
     );
 
     if cfg!(debug_assertions) {
-        debug_assert!(next_row.header().cell().index != next_row.index);
+        debug_assert!(next_row.column().cell().index != next_row.index);
     }
 
     sol_dict.insert(k, next_row);

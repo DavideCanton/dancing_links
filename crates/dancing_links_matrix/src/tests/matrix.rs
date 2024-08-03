@@ -3,22 +3,14 @@ use itertools::Itertools;
 use test_case::test_matrix;
 
 use crate::{
-    cells::{CellRow, HeaderName, HeaderRef, MatrixCellRef},
-    matrix::{CellIteratorDirection, HeaderIteratorDirection},
+    cells::{CellRow, ColumnName, ColumnRef, MatrixCellRef},
+    matrix::{CellIteratorDir, ColumnIteratorDir},
     tests::utils::BumpArena,
     Arena, DancingLinksMatrix, MatrixBuilder,
 };
-use HeaderName::{First as F, Other as O};
+use ColumnName::{First as F, Other as O};
 
 use super::utils::create_row;
-
-fn find_cell<'a>(mat: &'a DancingLinksMatrix<'a, String>, row: usize, name: &str) -> Option<usize> {
-    locate_cell(mat, row, name).map(|c| c.index)
-}
-
-fn find_header<'a>(mat: &'a DancingLinksMatrix<'a, String>, name: &str) -> Option<usize> {
-    locate_header(mat, name).map(|h| h.index)
-}
 
 #[test]
 fn test_locate_cell() {
@@ -34,12 +26,12 @@ fn test_locate_cell() {
 }
 
 #[test]
-fn test_locate_header() {
+fn test_locate_column() {
     let arena: BumpArena = Bump::new().into();
     let matrix = build_matrix(&arena);
-    assert_eq!(find_header(&matrix, "1").unwrap(), 1);
-    assert_eq!(find_header(&matrix, "2").unwrap(), 2);
-    assert_eq!(find_header(&matrix, "6"), None);
+    assert_eq!(find_column(&matrix, "1").unwrap(), 1);
+    assert_eq!(find_column(&matrix, "2").unwrap(), 2);
+    assert_eq!(find_column(&matrix, "6"), None);
 }
 
 #[test]
@@ -79,14 +71,14 @@ fn test_iterator_no_rows() {
 }
 
 #[test_matrix([true, false]; "include_start")]
-fn test_header_cell_iterator_right_from_first(include_start: bool) {
+fn test_column_cell_iterator_right_from_first(include_start: bool) {
     let arena: BumpArena = Bump::new().into();
     let matrix = build_matrix(&arena);
 
-    let actual: Vec<HeaderName<_>> = matrix
-        .iterate_headers(
-            matrix.first_header(),
-            HeaderIteratorDirection::Right,
+    let actual: Vec<ColumnName<_>> = matrix
+        .iterate_columns(
+            matrix.first_column(),
+            ColumnIteratorDir::Right,
             include_start,
         )
         .map(|h| h.name.clone())
@@ -101,13 +93,13 @@ fn test_header_cell_iterator_right_from_first(include_start: bool) {
 }
 
 #[test_matrix([true, false]; "include_start")]
-fn test_header_cell_iterator_right(include_start: bool) {
+fn test_column_cell_iterator_right(include_start: bool) {
     let arena: BumpArena = Bump::new().into();
     let matrix: DancingLinksMatrix<String> = build_matrix(&arena);
-    let index = locate_header(&matrix, "1").unwrap();
+    let index = locate_column(&matrix, "1").unwrap();
 
-    let actual: Vec<HeaderName<_>> = matrix
-        .iterate_headers(index, HeaderIteratorDirection::Right, include_start)
+    let actual: Vec<ColumnName<_>> = matrix
+        .iterate_columns(index, ColumnIteratorDir::Right, include_start)
         .map(|h| h.name.clone())
         .collect();
 
@@ -120,13 +112,13 @@ fn test_header_cell_iterator_right(include_start: bool) {
 }
 
 #[test_matrix([true, false]; "include_start")]
-fn test_header_cell_iterator_left(include_start: bool) {
+fn test_column_cell_iterator_left(include_start: bool) {
     let arena: BumpArena = Bump::new().into();
     let matrix = build_matrix(&arena);
-    let index = locate_header(&matrix, "1").unwrap();
+    let index = locate_column(&matrix, "1").unwrap();
 
-    let actual: Vec<HeaderName<_>> = matrix
-        .iterate_headers(index, HeaderIteratorDirection::Left, include_start)
+    let actual: Vec<ColumnName<_>> = matrix
+        .iterate_columns(index, ColumnIteratorDir::Left, include_start)
         .map(|h| h.name.clone())
         .collect();
     let mut exp = vec![F, O("3".to_string()), O("2".to_string())];
@@ -145,7 +137,7 @@ fn test_cell_iterator_left(include_start: bool) {
     let index = locate_cell(&matrix, 4, "2").unwrap();
 
     let actual: Vec<_> = matrix
-        .iterate_cells(index, CellIteratorDirection::Left, include_start)
+        .iterate_cells(index, CellIteratorDir::Left, include_start)
         .map(|h| h.index)
         .collect();
 
@@ -171,7 +163,7 @@ fn test_cell_iterator_right(include_start: bool) {
     let index = locate_cell(&matrix, 4, "2").unwrap();
 
     let actual: Vec<_> = matrix
-        .iterate_cells(index, CellIteratorDirection::Right, include_start)
+        .iterate_cells(index, CellIteratorDir::Right, include_start)
         .map(|h| h.index)
         .collect();
 
@@ -197,7 +189,7 @@ fn test_cell_iterator_up(include_start: bool) {
     let index = locate_cell(&matrix, 2, "1").unwrap();
 
     let actual: Vec<_> = matrix
-        .iterate_cells(index, CellIteratorDirection::Up, include_start)
+        .iterate_cells(index, CellIteratorDir::Up, include_start)
         .map(|h| h.index)
         .collect();
 
@@ -223,7 +215,7 @@ fn test_cell_iterator_down(include_start: bool) {
     let index = locate_cell(&matrix, 1, "2").unwrap();
 
     let actual: Vec<_> = matrix
-        .iterate_cells(index, CellIteratorDirection::Down, include_start)
+        .iterate_cells(index, CellIteratorDir::Down, include_start)
         .map(|h| h.index)
         .collect();
 
@@ -263,25 +255,33 @@ where
     T: AsRef<C>,
     C: Eq + ?Sized,
 {
-    let header = locate_header(matrix, column)?;
+    let column = locate_column(matrix, column)?;
     let row = row.into();
 
     matrix
-        .iterate_cells(header.cell(), CellIteratorDirection::Down, true)
+        .iterate_cells(column.cell(), CellIteratorDir::Down, true)
         .find(|c| c.row == row)
 }
 
-fn locate_header<'a, T, C>(
+fn locate_column<'a, T, C>(
     matrix: &DancingLinksMatrix<'a, T>,
     column: &C,
-) -> Option<HeaderRef<'a, T>>
+) -> Option<ColumnRef<'a, T>>
 where
     T: AsRef<C>,
     C: Eq + ?Sized,
 {
-    use crate::cells::HeaderName;
+    use crate::cells::ColumnName;
 
     matrix
-        .iterate_headers(matrix.first_header(), HeaderIteratorDirection::Right, true)
-        .find(|h| matches!(h.name, HeaderName::Other(ref c) if *c.as_ref() == *column))
+        .iterate_columns(matrix.first_column(), ColumnIteratorDir::Right, true)
+        .find(|h| matches!(h.name, ColumnName::Other(ref c) if *c.as_ref() == *column))
+}
+
+fn find_cell<'a>(mat: &'a DancingLinksMatrix<'a, String>, row: usize, name: &str) -> Option<usize> {
+    locate_cell(mat, row, name).map(|c| c.index)
+}
+
+fn find_column<'a>(mat: &'a DancingLinksMatrix<'a, String>, name: &str) -> Option<usize> {
+    locate_column(mat, name).map(|h| h.index)
 }

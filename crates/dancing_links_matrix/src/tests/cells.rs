@@ -1,8 +1,8 @@
 use std::ptr;
 
-use crate::cells::{CellRow, Header, HeaderName, MatrixCell, ProtoCell, ProtoHeader};
+use crate::cells::{CellRow, ColumnInfo, ColumnName, MatrixCell, ProtoCell, ProtoColumn};
 
-use HeaderName::{First as F, Other as O};
+use ColumnName::{First as F, Other as O};
 
 #[test]
 fn test_matrix_cell_new() {
@@ -12,13 +12,13 @@ fn test_matrix_cell_new() {
     assert!(!cell.has_down());
     assert!(!cell.has_left());
     assert!(!cell.has_right());
-    assert!(!cell.has_header());
+    assert!(!cell.has_column());
     assert_eq!(cell.row, 3.into());
 }
 
 #[test]
 fn test_matrix_cell_update_pointers() {
-    let header = Header::new(O(1), 3, 5, true);
+    let column = ColumnInfo::new(O(1), 3, 5, true);
 
     let cell = MatrixCell::new(42, 3.into());
     let up = MatrixCell::new(43, 2.into());
@@ -26,26 +26,26 @@ fn test_matrix_cell_update_pointers() {
     let left = MatrixCell::new(45, 1.into());
     let right = MatrixCell::new(46, 5.into());
 
-    cell.update_pointers(&up, &down, &left, &right, &header);
+    cell.update_pointers(&up, &down, &left, &right, &column);
 
     assert!(ptr::eq(cell.up(), &up));
     assert!(ptr::eq(cell.down(), &down));
     assert!(ptr::eq(cell.left(), &left));
     assert!(ptr::eq(cell.right(), &right));
-    assert!(ptr::eq(cell.header(), &header));
+    assert!(ptr::eq(cell.column(), &column));
 
     assert!(cell.has_up());
     assert!(cell.has_down());
     assert!(cell.has_left());
     assert!(cell.has_right());
-    assert!(cell.has_header());
+    assert!(cell.has_column());
 }
 
 #[test]
 fn test_proto_cell_new() {
     let proto = ProtoCell::new(42, 3, CellRow::Header);
     assert_eq!(proto.index, 42);
-    assert_eq!(proto.header, 3);
+    assert_eq!(proto.column, 3);
     assert_eq!(proto.row, CellRow::Header);
     assert_eq!(proto.up, 42);
     assert_eq!(proto.down, 42);
@@ -54,85 +54,83 @@ fn test_proto_cell_new() {
 }
 
 #[test]
-fn test_proto_header_new() {
-    let proto = ProtoHeader::<()>::new(42, F, 3, true);
+fn test_proto_column_new() {
+    let proto = ProtoColumn::<()>::new(42, F, true);
     assert_eq!(proto.index, 42);
     assert_eq!(proto.name, F);
-    assert_eq!(proto.size, 3);
+    assert_eq!(proto.size, 0);
     assert!(proto.primary);
 
-    let proto2 = ProtoHeader::new(42, O(1), 3, false);
+    let proto2 = ProtoColumn::new(42, O(1), false);
     assert_eq!(proto2.name, O(1));
     assert!(!proto2.primary);
 }
 
 #[test]
-fn test_header_new() {
-    let header = Header::new(O(1), 3, 2, true);
-    assert_eq!(header.name, O(1));
-    assert_eq!(header.size(), 2);
-    assert_eq!(header.index, 3);
-    assert!(header.primary);
-    assert!(!header.is_first());
-    assert!(!header.has_cell());
+fn test_column_new() {
+    let column = ColumnInfo::new(O(1), 3, 2, true);
+    assert_eq!(column.name, O(1));
+    assert_eq!(column.size(), 2);
+    assert_eq!(column.index, 3);
+    assert!(column.primary);
+    assert!(!column.has_cell());
 
-    let header = Header::<u32>::new(F, 10, 8, false);
-    assert_eq!(header.name, F);
-    assert_eq!(header.size(), 8);
-    assert_eq!(header.index, 10);
-    assert!(!header.primary);
-    assert!(header.is_first());
-    assert!(!header.has_cell());
+    let column = ColumnInfo::<u32>::new(F, 10, 8, false);
+    assert_eq!(column.name, F);
+    assert_eq!(column.size(), 8);
+    assert_eq!(column.index, 10);
+    assert!(!column.primary);
+    assert!(!column.has_cell());
 }
 
 #[test]
-fn test_header_from_proto() {
-    let mut proto = ProtoHeader::new(42, O(1), 3, true);
-    let header = Header::from_proto(proto.clone());
-    assert_eq!(header.name, O(1));
-    assert_eq!(header.size(), 3);
-    assert_eq!(header.index, 42);
-    assert!(!header.has_cell());
-    assert!(header.primary);
+fn test_column_from_proto() {
+    let mut proto = ProtoColumn::new(42, O(1), true);
+    let column = ColumnInfo::from_proto(proto.clone());
+    assert_eq!(column.name, O(1));
+    assert_eq!(column.size(), 0);
+    assert_eq!(column.index, 42);
+    assert!(!column.has_cell());
+    assert!(column.primary);
 
     proto.primary = false;
-    let header = Header::from_proto(proto);
-    assert!(!header.primary);
+    let column = ColumnInfo::from_proto(proto);
+    assert!(!column.primary);
 }
 
 #[test]
-fn test_header_update_pointer() {
-    let header = Header::<u32>::new(F, 10, 8, true);
+fn test_column_update_pointer() {
+    let column = ColumnInfo::<u32>::new(F, 10, 8, true);
     let cell = MatrixCell::new(42, CellRow::Header);
 
-    header.update_pointer(&cell);
+    column.update_pointer(&cell);
 
-    assert!(ptr::eq(header.cell(), &cell));
-    assert!(header.has_cell());
+    assert!(ptr::eq(column.cell(), &cell));
+    assert!(column.has_cell());
 }
 
 #[test]
-fn test_header_size() {
-    let header = Header::new(O(1), 3, 1, true);
-    assert_eq!(header.size(), 1);
+fn test_column_size() {
+    let column = ColumnInfo::new(O(1), 3, 1, true);
+    assert_eq!(column.size(), 1);
 
-    assert_eq!(header.increase_size(), 2);
-    assert_eq!(header.size(), 2);
+    assert_eq!(column.increase_size(), 2);
+    assert_eq!(column.size(), 2);
 
-    assert_eq!(header.decrease_size(), 1);
-    assert_eq!(header.size(), 1);
+    assert_eq!(column.decrease_size(), 1);
+    assert_eq!(column.size(), 1);
 
-    header.increase_size();
-    assert_eq!(header.size(), 2);
+    column.increase_size();
+    assert_eq!(column.size(), 2);
 
-    header.decrease_size();
-    assert_eq!(header.size(), 1);
+    column.decrease_size();
+    assert_eq!(column.size(), 1);
 
-    header.decrease_size();
-    assert_eq!(header.size(), 0);
+    column.decrease_size();
+    assert_eq!(column.size(), 0);
 
-    assert!(header.empty());
+    assert!(column.empty());
 
-    header.increase_size();
-    assert_eq!(header.size(), 1);
+    column.increase_size();
+    assert_eq!(column.size(), 1);
 }

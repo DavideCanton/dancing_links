@@ -9,8 +9,8 @@ use itertools::Itertools;
 use rand::{thread_rng, Rng};
 
 use crate::{
-    cells::{CellRow, HeaderRef, MatrixCellRef},
-    queue::HeaderPriorityQueue,
+    cells::{CellRow, ColumnRef, MatrixCellRef},
+    queue::ColumnPriorityQueue,
 };
 
 pub struct ColumnSpec<T> {
@@ -41,16 +41,16 @@ impl<T> From<T> for ColumnSpec<T> {
 }
 
 pub struct DancingLinksMatrix<'a, T> {
-    pub(crate) rows: usize,
-    pub(crate) columns: usize,
-    pub(crate) headers: Box<[HeaderRef<'a, T>]>,
+    pub(crate) row_count: usize,
+    pub(crate) column_count: usize,
+    pub(crate) columns: Box<[ColumnRef<'a, T>]>,
     pub(crate) cells: Box<[MatrixCellRef<'a, T>]>,
-    pub(crate) headers_queue: HeaderPriorityQueue<'a, T>,
+    pub(crate) columns_queue: ColumnPriorityQueue<'a, T>,
 }
 
 impl<'a, T> DancingLinksMatrix<'a, T> {
-    pub(crate) fn first_header(&self) -> HeaderRef<'a, T> {
-        self.headers[0]
+    pub(crate) fn first_column(&self) -> ColumnRef<'a, T> {
+        self.columns[0]
     }
 
     pub fn iter_rows<Ret>(&'a self) -> impl Iterator<Item = HashSet<&'a Ret>>
@@ -64,69 +64,69 @@ impl<'a, T> DancingLinksMatrix<'a, T> {
                 CellRow::Header => None,
                 CellRow::Data(_) => Some(HashSet::from_iter(
                     x.iter()
-                        .map(|c| c.header().name.get_name().unwrap().as_ref()),
+                        .map(|c| c.column().name.get_name().unwrap().as_ref()),
                 )),
             })
     }
 
-    pub(crate) fn min_column(&self) -> HeaderRef<'a, T> {
-        self.headers_queue.peek().unwrap()
+    pub(crate) fn min_column(&self) -> ColumnRef<'a, T> {
+        self.columns_queue.peek().unwrap()
     }
 
-    pub(crate) fn random_column(&self) -> HeaderRef<'a, T> {
-        let num = thread_rng().gen_range(0..self.columns);
+    pub(crate) fn random_column(&self) -> ColumnRef<'a, T> {
+        let num = thread_rng().gen_range(0..self.column_count);
 
-        let start = self.first_header();
+        let start = self.first_column();
 
-        let mut iter = self.iterate_headers(start, HeaderIteratorDirection::Right, false);
+        let mut iter = self.iterate_columns(start, ColumnIteratorDir::Right, false);
 
         iter.nth(num).unwrap()
     }
 
-    pub(crate) fn cover(&self, header: HeaderRef<'a, T>) {
-        let pq = &self.headers_queue;
+    pub(crate) fn cover(&self, column: ColumnRef<'a, T>) {
+        let pq = &self.columns_queue;
 
-        let hc = header.cell();
-        hc.skip_lr();
+        let hc = column.cell();
+        hc.skip_horizontal();
 
-        pq.remove(header);
+        pq.remove(column);
 
-        for i in self.iterate_cells(hc, CellIteratorDirection::Down, false) {
-            for j in self.iterate_cells(i, CellIteratorDirection::Right, false) {
-                j.skip_ud();
-                j.header().decrease_size();
-                pq.change_priority(j.header());
+        for i in self.iterate_cells(hc, CellIteratorDir::Down, false) {
+            for j in self.iterate_cells(i, CellIteratorDir::Right, false) {
+                j.skip_vertical();
+                j.column().decrease_size();
+                pq.change_priority(j.column());
             }
         }
     }
 
-    pub(crate) fn uncover(&self, header: HeaderRef<'a, T>) {
-        let hc = header.cell();
+    pub(crate) fn uncover(&self, column: ColumnRef<'a, T>) {
+        let hc = column.cell();
 
-        let pq = &self.headers_queue;
+        let pq = &self.columns_queue;
 
-        for i in self.iterate_cells(hc, CellIteratorDirection::Up, false) {
-            for j in self.iterate_cells(i, CellIteratorDirection::Left, false) {
-                j.restore_ud();
-                j.header().increase_size();
-                pq.change_priority(j.header());
+        for i in self.iterate_cells(hc, CellIteratorDir::Up, false) {
+            for j in self.iterate_cells(i, CellIteratorDir::Left, false) {
+                j.restore_vertical();
+                j.column().increase_size();
+                pq.change_priority(j.column());
             }
         }
 
-        hc.restore_lr();
+        hc.restore_horizontal();
 
-        if header.primary {
-            pq.push(header);
+        if column.primary {
+            pq.push(column);
         }
     }
 
     pub(crate) fn iterate_cells(
         &self,
         start: MatrixCellRef<'a, T>,
-        direction: CellIteratorDirection,
+        direction: CellIteratorDir,
         mut include_start: bool,
     ) -> impl Iterator<Item = MatrixCellRef<'a, T>> {
-        use CellIteratorDirection::*;
+        use CellIteratorDir::*;
 
         let mut end = false;
         let mut current = start;
@@ -159,13 +159,13 @@ impl<'a, T> DancingLinksMatrix<'a, T> {
         })
     }
 
-    pub(crate) fn iterate_headers(
+    pub(crate) fn iterate_columns(
         &self,
-        start: HeaderRef<'a, T>,
-        direction: HeaderIteratorDirection,
+        start: ColumnRef<'a, T>,
+        direction: ColumnIteratorDir,
         mut include_start: bool,
-    ) -> impl Iterator<Item = HeaderRef<'a, T>> {
-        use HeaderIteratorDirection::*;
+    ) -> impl Iterator<Item = ColumnRef<'a, T>> {
+        use ColumnIteratorDir::*;
 
         let mut end = false;
         let mut current = start;
@@ -180,15 +180,14 @@ impl<'a, T> DancingLinksMatrix<'a, T> {
                 return Some(current);
             }
 
-            let current_header = current;
-            let cell = current_header.cell();
+            let cell = current.cell();
 
-            let next_header_cell = match &direction {
+            let next_col_cell = match &direction {
                 Right => cell.right(),
                 Left => cell.left(),
             };
 
-            current = next_header_cell.header();
+            current = next_col_cell.column();
 
             if ptr::eq(current, start) {
                 end = true;
@@ -206,14 +205,14 @@ impl<'a, T: fmt::Debug> fmt::Debug for DancingLinksMatrix<'a, T> {
 
         let mut is_first = true;
 
-        for header in self.headers.iter() {
+        for column in &self.columns {
             if is_first {
                 is_first = false;
             } else {
                 matrix.push(' ');
             }
 
-            matrix.push_str(&format!("{:>4?}", header.name));
+            matrix.push_str(&format!("{:>4?}", column.name));
         }
 
         matrix.push('\n');
@@ -226,7 +225,7 @@ impl<'a, T: fmt::Debug> fmt::Debug for DancingLinksMatrix<'a, T> {
         ));
         matrix.push('\n');
 
-        for cell in self.cells.iter() {
+        for cell in &self.cells {
             if is_first {
                 is_first = false;
             } else {
@@ -240,7 +239,7 @@ impl<'a, T: fmt::Debug> fmt::Debug for DancingLinksMatrix<'a, T> {
                 cell.down().index,
                 cell.left().index,
                 cell.right().index,
-                cell.header().index,
+                cell.column().index,
                 cell.row
             ));
         }
@@ -249,40 +248,35 @@ impl<'a, T: fmt::Debug> fmt::Debug for DancingLinksMatrix<'a, T> {
 }
 
 impl<'a, T: fmt::Display> fmt::Display for &'a DancingLinksMatrix<'a, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut rows = vec![" ".repeat(self.headers.len() * 5); self.rows + 1];
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut rows = vec![" ".repeat(self.columns.len() * 5); self.row_count + 1];
         let mut inds = HashMap::new();
 
-        for (i, header) in self
-            .iterate_headers(self.first_header(), HeaderIteratorDirection::Right, true)
+        for (i, column) in self
+            .iterate_columns(self.first_column(), ColumnIteratorDir::Right, true)
             .enumerate()
         {
             let ind = i * 5;
-            inds.insert(header.index, ind);
-            rows[0].replace_range(ind..ind + 4, &format!("{:>4}", header.name));
+            inds.insert(column.index, ind);
+            rows[0].replace_range(ind..ind + 4, &format!("{:>4}", column.name));
         }
 
-        for header in
-            self.iterate_headers(self.first_header(), HeaderIteratorDirection::Right, true)
-        {
-            for c in self.iterate_cells(header.cell(), CellIteratorDirection::Down, false) {
-                let header = c.header();
-                let ind = inds[&header.index];
+        for column in self.iterate_columns(self.first_column(), ColumnIteratorDir::Right, true) {
+            for c in self.iterate_cells(column.cell(), CellIteratorDir::Down, false) {
+                let ind = inds[&c.column().index];
 
                 let row: usize = c.row.into();
                 rows[row].replace_range(ind..ind + 4, &format!("{:>4}", c.index));
             }
         }
 
-        write!(
-            f,
-            "{}",
-            rows.into_iter().filter(|r| !r.trim().is_empty()).join("\n")
-        )
+        let result = rows.into_iter().filter(|r| !r.trim().is_empty()).join("\n");
+
+        write!(fmt, "{}", result)
     }
 }
 
-pub(crate) enum CellIteratorDirection {
+pub(crate) enum CellIteratorDir {
     Up,
     Down,
     Left,
@@ -290,7 +284,7 @@ pub(crate) enum CellIteratorDirection {
 }
 
 #[allow(dead_code)]
-pub(crate) enum HeaderIteratorDirection {
+pub(crate) enum ColumnIteratorDir {
     Right,
     Left,
 }
