@@ -12,17 +12,17 @@ use crate::{
     DancingLinksMatrix,
 };
 
-pub struct Solution<T> {
-    pub solution_map: HashMap<usize, Vec<T>>,
+pub struct Solution<'a, T> {
+    pub solution_map: HashMap<usize, Vec<&'a T>>,
 }
 
-fn cover_row<'a, T: Eq>(matrix: &DancingLinksMatrix<'a, T>, row: MatrixCellRef<'a, T>) {
+fn cover_row<'a, T>(matrix: &DancingLinksMatrix<'a, T>, row: MatrixCellRef<'a, T>) {
     for j in matrix.iterate_cells(row, CellIteratorDirection::Right, false) {
         matrix.cover(j.header())
     }
 }
 
-fn uncover_row<'a, T: Eq>(matrix: &DancingLinksMatrix<'a, T>, row: MatrixCellRef<'a, T>) {
+fn uncover_row<'a, T>(matrix: &DancingLinksMatrix<'a, T>, row: MatrixCellRef<'a, T>) {
     for j in matrix.iterate_cells(row, CellIteratorDirection::Left, false) {
         matrix.uncover(j.header())
     }
@@ -34,7 +34,6 @@ pub struct IterativeAlgorithmXSolver<'a, T> {
     return_first: bool,
 }
 
-#[derive(Clone)]
 enum StackElem<'a, T> {
     Root,
     Iteration {
@@ -42,6 +41,14 @@ enum StackElem<'a, T> {
         current_row: MatrixCellRef<'a, T>,
         start_row: MatrixCellRef<'a, T>,
     },
+}
+
+impl<T> Copy for StackElem<'_, T> {}
+
+impl<T> Clone for StackElem<'_, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl<'a, T> StackElem<'a, T> {
@@ -53,7 +60,7 @@ impl<'a, T> StackElem<'a, T> {
     }
 }
 
-impl<'a, T: Eq + Clone> Debug for StackElem<'a, T> {
+impl<'a, T> Debug for StackElem<'a, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             StackElem::Root => write!(f, "Root"),
@@ -70,7 +77,7 @@ impl<'a, T: Eq + Clone> Debug for StackElem<'a, T> {
     }
 }
 
-impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
+impl<'a, T> IterativeAlgorithmXSolver<'a, T> {
     pub fn new(matrix: DancingLinksMatrix<'a, T>, choose_min: bool, return_first: bool) -> Self {
         Self {
             matrix,
@@ -97,7 +104,7 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
                 .iterate_cells(*row, CellIteratorDirection::Right, true)
             {
                 if let HeaderName::Other(ref name) = r.name() {
-                    tmp_list.push(name.clone());
+                    tmp_list.push(name);
                 }
             }
 
@@ -118,7 +125,7 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
         use StackElem::*;
         let mut stack = vec![Root];
 
-        while let Some(elem) = stack.last().cloned() {
+        while let Some(elem) = stack.last().copied() {
             debug!("elem: {elem:?}, advance: {advance}");
             // trace!("matrix:\n{}", self.matrix);
 
@@ -203,7 +210,7 @@ impl<'a, T: Eq + Clone> IterativeAlgorithmXSolver<'a, T> {
     }
 }
 
-fn add_to_sol<'a, T: Eq>(
+fn add_to_sol<'a, T>(
     sol_dict: &mut hashbrown::HashMap<usize, MatrixCellRef<'a, T>>,
     k: usize,
     next_row: MatrixCellRef<'a, T>,

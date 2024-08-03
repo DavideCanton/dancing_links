@@ -48,7 +48,7 @@ pub struct DancingLinksMatrix<'a, T> {
     pub(crate) headers_queue: HeaderPriorityQueue<'a, T>,
 }
 
-impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
+impl<'a, T> DancingLinksMatrix<'a, T> {
     pub(crate) fn first_header(&self) -> HeaderRef<'a, T> {
         self.headers[0]
     }
@@ -198,36 +198,9 @@ impl<'a, T: Eq> DancingLinksMatrix<'a, T> {
             Some(current)
         })
     }
-
-    #[cfg(test)]
-    pub(crate) fn locate_cell<R: Into<CellRow>, C: Eq + ?Sized>(
-        &self,
-        row: R,
-        column: &C,
-    ) -> Option<MatrixCellRef<'a, T>>
-    where
-        T: AsRef<C>,
-    {
-        let header = self.locate_header(column)?;
-        let row = row.into();
-
-        self.iterate_cells(header.cell(), CellIteratorDirection::Down, true)
-            .find(|c| c.row == row)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn locate_header<C: Eq + ?Sized>(&self, column: &C) -> Option<HeaderRef<'a, T>>
-    where
-        T: AsRef<C>,
-    {
-        use crate::cells::HeaderName;
-
-        self.iterate_headers(self.first_header(), HeaderIteratorDirection::Right, true)
-            .find(|h| matches!(h.name, HeaderName::Other(ref c) if *c.as_ref() == *column))
-    }
 }
 
-impl<'a, T: fmt::Debug + Eq> fmt::Debug for DancingLinksMatrix<'a, T> {
+impl<'a, T: fmt::Debug> fmt::Debug for DancingLinksMatrix<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut matrix = String::new();
 
@@ -275,7 +248,7 @@ impl<'a, T: fmt::Debug + Eq> fmt::Debug for DancingLinksMatrix<'a, T> {
     }
 }
 
-impl<'a, T: fmt::Display + Eq> fmt::Display for &'a DancingLinksMatrix<'a, T> {
+impl<'a, T: fmt::Display> fmt::Display for &'a DancingLinksMatrix<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut rows = vec![" ".repeat(self.headers.len() * 5); self.rows + 1];
         let mut inds = HashMap::new();

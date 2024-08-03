@@ -28,10 +28,7 @@ impl MatrixBuilder {
     /// [`MatrixBuilder`]: MatrixBuilder
     pub fn from_iterable<T>(
         iterable: impl IntoIterator<Item = impl Into<ColumnSpec<T>>>,
-    ) -> MatrixRowBuilder<T>
-    where
-        T: Eq,
-    {
+    ) -> MatrixRowBuilder<T> {
         iterable.into_iter().collect::<MatrixRowBuilder<T>>()
     }
 
@@ -40,10 +37,7 @@ impl MatrixBuilder {
     /// Returns a [`MatrixColBuilder`], that can be used to add more columns to the matrix.
     ///
     /// [`MatrixBuilder`]: MatrixBuilder
-    pub fn add_column<T>(self, spec: impl Into<ColumnSpec<T>>) -> MatrixColBuilder<T>
-    where
-        T: Eq,
-    {
+    pub fn add_column<T>(self, spec: impl Into<ColumnSpec<T>>) -> MatrixColBuilder<T> {
         MatrixColBuilder::new().add_column(spec)
     }
 }
@@ -58,7 +52,7 @@ pub struct MatrixColBuilder<T> {
     columns: Vec<ColumnSpec<T>>,
 }
 
-impl<T: Eq, I: Into<ColumnSpec<T>>> FromIterator<I> for MatrixColBuilder<T> {
+impl<T, I: Into<ColumnSpec<T>>> FromIterator<I> for MatrixColBuilder<T> {
     fn from_iter<IT>(iter: IT) -> Self
     where
         IT: IntoIterator<Item = I>,
@@ -74,7 +68,7 @@ impl<T: Eq, I: Into<ColumnSpec<T>>> FromIterator<I> for MatrixColBuilder<T> {
     }
 }
 
-impl<T: Eq> MatrixColBuilder<T> {
+impl<T> MatrixColBuilder<T> {
     fn new() -> MatrixColBuilder<T> {
         MatrixColBuilder { columns: vec![] }
     }
@@ -131,7 +125,6 @@ pub struct MatrixRowBuilder<T> {
 
 impl<T, I> FromIterator<I> for MatrixRowBuilder<T>
 where
-    T: Eq,
     I: Into<ColumnSpec<T>>,
 {
     fn from_iter<IT>(iter: IT) -> Self
@@ -144,10 +137,7 @@ where
     }
 }
 
-impl<T> MatrixRowBuilder<T>
-where
-    T: Eq,
-{
+impl<T> MatrixRowBuilder<T> {
     /// Add a row to the [`MatrixRowBuilder`] using indexes.
     ///
     /// Indexes must be in the range from 1 to `n` where `n` is the number of columns in the matrix, in the order that the columns were added.
@@ -187,7 +177,10 @@ where
     /// Add a sorted row to the [`MatrixRowBuilder`].
     ///
     /// [`MatrixRowBuilder`]: MatrixRowBuilder
-    pub fn add_sorted_row(self, row: impl IntoIterator<Item = T>) -> Self {
+    pub fn add_sorted_row(self, row: impl IntoIterator<Item = T>) -> Self
+    where
+        T: Eq,
+    {
         let mut to_add = Vec::new();
 
         {
