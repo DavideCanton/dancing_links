@@ -4,8 +4,10 @@ use priority_queue::PriorityQueue;
 
 use crate::cells::{ColumnInfo, ColumnRef};
 
+type PriorityKey = (isize, usize);
+
 pub(crate) struct ColumnPriorityQueue<'a, T> {
-    queue: RefCell<PriorityQueue<ColumnRef<'a, T>, (isize, usize)>>,
+    queue: RefCell<PriorityQueue<ColumnRef<'a, T>, PriorityKey>>,
 }
 
 impl<'a, T> ColumnPriorityQueue<'a, T> {
@@ -36,6 +38,6 @@ impl<'a, T> ColumnPriorityQueue<'a, T> {
     }
 }
 
-fn column_priority<T>(column: &ColumnInfo<'_, T>) -> (isize, usize) {
+fn column_priority<T>(column: &ColumnInfo<'_, T>) -> PriorityKey {
     (-(column.size() as isize), column.index)
 }

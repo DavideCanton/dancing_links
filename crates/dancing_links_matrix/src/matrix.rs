@@ -9,7 +9,7 @@ use itertools::Itertools;
 use rand::{thread_rng, Rng};
 
 use crate::{
-    cells::{CellRow, ColumnRef, MatrixCellRef},
+    cells::{CellRow, ColumnRef, MatrixCell, MatrixCellRef},
     queue::ColumnPriorityQueue,
 };
 
@@ -131,6 +131,13 @@ impl<'a, T> DancingLinksMatrix<'a, T> {
         let mut end = false;
         let mut current = start;
 
+        let get_next = match direction {
+            Up => MatrixCell::up,
+            Down => MatrixCell::down,
+            Left => MatrixCell::left,
+            Right => MatrixCell::right,
+        };
+
         iter::from_fn(move || {
             if end {
                 return None;
@@ -141,14 +148,7 @@ impl<'a, T> DancingLinksMatrix<'a, T> {
                 return Some(current);
             }
 
-            let cell = current;
-
-            current = match direction {
-                Up => cell.up(),
-                Down => cell.down(),
-                Left => cell.left(),
-                Right => cell.right(),
-            };
+            current = get_next(current);
 
             if ptr::eq(current, start) {
                 end = true;
@@ -170,6 +170,11 @@ impl<'a, T> DancingLinksMatrix<'a, T> {
         let mut end = false;
         let mut current = start;
 
+        let get_next = match direction {
+            Right => MatrixCell::right,
+            Left => MatrixCell::left,
+        };
+
         iter::from_fn(move || {
             if end {
                 return None;
@@ -180,12 +185,7 @@ impl<'a, T> DancingLinksMatrix<'a, T> {
                 return Some(current);
             }
 
-            let cell = current.cell();
-
-            let next_col_cell = match &direction {
-                Right => cell.right(),
-                Left => cell.left(),
-            };
+            let next_col_cell = get_next(current.cell());
 
             current = next_col_cell.column();
 

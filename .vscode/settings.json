@@ -1,10 +1,4 @@
 {
-    "cSpell.words": [
-        "bumpalo",
-        "itertools",
-    ],
-    "rust-analyzer.check.command": "clippy",
-    "rust-analyzer.inlayHints.genericParameterHints.lifetime.enable": true,
-    "rust-analyzer.inlayHints.lifetimeElisionHints.enable": "always",
-    "rust-analyzer.inlayHints.lifetimeElisionHints.useParameterNames": true
+  "cSpell.words": ["bumpalo", "itertools"],
+  "rust-analyzer.check.command": "clippy"
 }
