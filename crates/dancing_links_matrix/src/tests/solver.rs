@@ -83,7 +83,7 @@ fn solve_first_sol() {
     }
 }
 
-fn solve<'a>(solver: &'a IterativeAlgorithmXSolver<'a, usize>) -> Vec<HashMap<usize, Vec<&usize>>> {
+fn solve<'a>(solver: &'a IterativeAlgorithmXSolver<'a, usize>) -> Vec<HashMap<usize, Vec<&'a usize>>> {
     let solutions = solver.solve();
     solutions.into_iter().map(|v| v.solution_map).collect()
 }

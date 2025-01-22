@@ -369,16 +369,16 @@ impl<'a, T> ColumnInfo<'a, T> {
     }
 }
 
-impl<'a, T> Hash for ColumnInfo<'a, T> {
+impl<T> Hash for ColumnInfo<'_, T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.index.hash(state);
     }
 }
 
-impl<'a, T> PartialEq for ColumnInfo<'a, T> {
+impl<T> PartialEq for ColumnInfo<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.index == other.index
     }
 }
 
-impl<'a, T> Eq for ColumnInfo<'a, T> {}
+impl<T> Eq for ColumnInfo<'_, T> {}

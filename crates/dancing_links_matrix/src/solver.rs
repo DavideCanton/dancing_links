@@ -51,7 +51,7 @@ impl<T> Clone for StackElem<'_, T> {
     }
 }
 
-impl<'a, T> StackElem<'a, T> {
+impl<T> StackElem<'_, T> {
     fn k(&self) -> usize {
         match self {
             StackElem::Root => 0,
@@ -60,7 +60,7 @@ impl<'a, T> StackElem<'a, T> {
     }
 }
 
-impl<'a, T> Debug for StackElem<'a, T> {
+impl<T> Debug for StackElem<'_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             StackElem::Root => write!(f, "Root"),

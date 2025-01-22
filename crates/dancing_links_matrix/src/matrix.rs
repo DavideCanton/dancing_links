@@ -199,7 +199,7 @@ impl<'a, T> DancingLinksMatrix<'a, T> {
     }
 }
 
-impl<'a, T: fmt::Debug> fmt::Debug for DancingLinksMatrix<'a, T> {
+impl<T: fmt::Debug> fmt::Debug for DancingLinksMatrix<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut matrix = String::new();
 
