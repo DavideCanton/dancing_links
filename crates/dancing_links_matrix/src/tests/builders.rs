@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use bumpalo::Bump;
 
 use crate::{
+    Arena, DancingLinksMatrix, MatrixBuilder,
     cells::{
         ColumnName::{self, First as F, Other as O},
         ColumnRef, MatrixCellRef,
     },
     tests::utils::BumpArena,
-    Arena, DancingLinksMatrix, MatrixBuilder,
 };
 
 use super::utils::create_row;

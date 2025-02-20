@@ -1,6 +1,6 @@
 use bumpalo::Bump;
 use clap::Parser;
-use cmd_common::{init_log, BumpArena, CommonArgs};
+use cmd_common::{BumpArena, CommonArgs, init_log};
 use dancing_links_matrix::{
     Arena, ColumnSpec, DancingLinksMatrix, IterativeAlgorithmXSolver, MatrixBuilder, Solution,
 };

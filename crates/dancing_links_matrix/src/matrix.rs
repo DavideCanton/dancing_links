@@ -6,7 +6,7 @@ use std::{
 };
 
 use itertools::Itertools;
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 
 use crate::{
     cells::{CellRow, ColumnRef, MatrixCell, MatrixCellRef},
@@ -125,7 +125,7 @@ impl<'a, T> DancingLinksMatrix<'a, T> {
         start: MatrixCellRef<'a, T>,
         direction: CellIteratorDir,
         mut include_start: bool,
-    ) -> impl Iterator<Item = MatrixCellRef<'a, T>> {
+    ) -> impl Iterator<Item = MatrixCellRef<'a, T>> + use<'a, T> {
         use CellIteratorDir::*;
 
         let mut end = false;
@@ -164,7 +164,7 @@ impl<'a, T> DancingLinksMatrix<'a, T> {
         start: ColumnRef<'a, T>,
         direction: ColumnIteratorDir,
         mut include_start: bool,
-    ) -> impl Iterator<Item = ColumnRef<'a, T>> {
+    ) -> impl Iterator<Item = ColumnRef<'a, T>> + use<'a, T> {
         use ColumnIteratorDir::*;
 
         let mut end = false;

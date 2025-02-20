@@ -7,9 +7,9 @@ use std::{
 use log::debug;
 
 use crate::{
+    DancingLinksMatrix,
     cells::{CellRow, ColumnName, ColumnRef, MatrixCellRef},
     matrix::CellIteratorDir,
-    DancingLinksMatrix,
 };
 
 pub struct Solution<'a, T> {
@@ -103,7 +103,7 @@ impl<'a, T> IterativeAlgorithmXSolver<'a, T> {
                 .matrix
                 .iterate_cells(*row, CellIteratorDir::Right, true)
             {
-                if let ColumnName::Other(ref name) = r.name() {
+                if let ColumnName::Other(name) = r.name() {
                     tmp_list.push(name);
                 }
             }

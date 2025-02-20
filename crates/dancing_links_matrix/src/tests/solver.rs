@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use bumpalo::Bump;
 
-use crate::{solver::IterativeAlgorithmXSolver, tests::utils::BumpArena, MatrixBuilder};
+use crate::{MatrixBuilder, solver::IterativeAlgorithmXSolver, tests::utils::BumpArena};
 
 #[test]
 fn solve_single_sol() {
@@ -83,7 +83,9 @@ fn solve_first_sol() {
     }
 }
 
-fn solve<'a>(solver: &'a IterativeAlgorithmXSolver<'a, usize>) -> Vec<HashMap<usize, Vec<&'a usize>>> {
+fn solve<'a>(
+    solver: &'a IterativeAlgorithmXSolver<'a, usize>,
+) -> Vec<HashMap<usize, Vec<&'a usize>>> {
     let solutions = solver.solve();
     solutions.into_iter().map(|v| v.solution_map).collect()
 }

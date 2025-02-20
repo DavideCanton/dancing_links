@@ -3,10 +3,10 @@ use itertools::Itertools;
 use test_case::test_matrix;
 
 use crate::{
+    Arena, DancingLinksMatrix, MatrixBuilder,
     cells::{CellRow, ColumnName, ColumnRef, MatrixCellRef},
     matrix::{CellIteratorDir, ColumnIteratorDir},
     tests::utils::BumpArena,
-    Arena, DancingLinksMatrix, MatrixBuilder,
 };
 use ColumnName::{First as F, Other as O};
 
